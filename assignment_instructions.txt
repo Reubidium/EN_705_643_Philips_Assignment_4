@@ -1,0 +1,43 @@
+Assignment 4 - Video Action Recognition
+
+In this assignment, we will use LRCN (https://openaccess.thecvf.com/content_cvpr_2015/papers/Donahue_Long-Term_Recurrent_Convolutional_2015_CVPR_paper.pdf) model to perform video action recognition on the UCF50 dataset (https://www.crcv.ucf.edu/data/UCF50.php), which can be downloaded from this link (downloads a UCF50.rar). UCF50 is an action recognition data set with 50 action categories, consisting of realistic videos taken from YouTube.
+
+For all the 50 categories, the videos are grouped into 25 groups, where each group consists of more than 4 action clips. The video clips in the same group may share some common features, such as the same person, similar background, and similar viewpoint. UCF50 data set's 50 action categories collected from YouTube are: Baseball Pitch, Basketball Shooting, Bench Press, Biking, Biking, Billiards Shot, Breaststroke, Clean and Jerk, Diving, Drumming, Fencing, Golf Swing, Playing Guitar, High Jump, Horse Race, Horse Riding, Hula Hoop, Javelin Throw, Juggling Balls, Jump Rope, Jumping Jack, Kayaking, Lunges, Military Parade, Mixing Batter, Nun chucks, Playing Piano, Pizza Tossing, Pole Vault, Pommel Horse, Pull Ups, Punch, Push Ups, Rock Climbing Indoor, Rope Climbing, Rowing, Salsa Spins, Skate Boarding, Skiing, Skijet, Soccer Juggling, Swing, Playing Tabla, TaiChi, Tennis Swing, Trampoline Jumping, Playing Violin, Volleyball Spiking, Walking with a dog, and YoYo. Please carefully review the full implementation of video classification on the HMDB51 dataset before starting this assignment. 
+
+Please download and set up the following code in a repo + the UCF50 dataset (which we will use for both train / eval):
+
+models.pyD
+README.mdD
+run_training.py
+run.py
+test.py
+test.sh
+train.sh
+train.py
+utils.py
+video_datasets.py
+requirements.txt
+
+The goal of this assignment is to mimic being an AI engineer who has inherited a bad codebase from a colleague and has been tasked with improving both the code and model performance.
+
+Note: There is a data leak (and you will need to fix it) AND a really, really, really significant bug (just FYI). Do not trust the work you read. If you are naive about this, you will fail. Must hit at least 93% test accuracy.
+
+You must do the following:
+
+1. Submit as a  public github repo of the fixed code
+
+2. Introduce weights and bias logging to the base (and submit evidence of performance on weights and biases for loss/accuracy for train/test/val)
+
+3. Submit an updated README for the base that describes the errors found / cleaned. 
+
+4. Make at least 2 model-level improvements to the base using techniques discussed in class (you can use LLM / AI tools to help you figure out what improvements to make, but you must be able to discuss them within your readme).
+
+5. Lint all code using pylint.
+
+6. Add documentation where missing.
+
+7. Add unit tests for key functionality using pytest.
+
+You will not be able to hit 93% without (1) improving the code and (2) fixing the bugs.
+
+No writeup needed!
