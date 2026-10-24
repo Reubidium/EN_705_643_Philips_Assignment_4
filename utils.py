@@ -50,6 +50,7 @@ def get_frames(vid, n_frames=1):
     for idx in range(v_len):
         success, frame = v_cap.read()
         if not success:
+            print(f"Failed to read frame {idx} from video: {vid}")
             continue
         if idx in frame_idx:
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -73,7 +74,6 @@ def store_frames(frames, store_path):
         None
     """
     for idx, frame in enumerate(frames):
-        print("processing")
         frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
         path_to_frame = os.path.join(store_path, "frame{}.jpg".format(idx))
         cv2.imwrite(path_to_frame, frame)
