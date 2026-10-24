@@ -27,7 +27,9 @@ def process_dataset(dataset_dir: Path, output_dir: Path, n_frames: int = 16, deb
             elif warning:
                 print(message)
 
-        for action_dir in sorted(path for path in dataset_dir.iterdir() if path.is_dir()):
+        action_dirs = sorted(path for path in dataset_dir.iterdir() if path.is_dir())
+        total_actions = len(action_dirs)
+        for action_count, action_dir in enumerate(action_dirs, start=1):
             report("=" * 50)
             report(f"Entering action directory \"{action_dir.name}\"")
             for video_path in sorted(action_dir.iterdir()):
@@ -46,6 +48,12 @@ def process_dataset(dataset_dir: Path, output_dir: Path, n_frames: int = 16, deb
                     )
                 else:
                     report(f"[WARNING] Skipping non-file entry: {video_path}", warning=True)
+            if action_count % 10 == 0:
+                print(
+                    f"Finished processing {action_count} of "
+                    f"{total_actions} action folders..."
+                )
+    print("Done.")
 
 
 def main() -> None:

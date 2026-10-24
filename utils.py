@@ -39,18 +39,18 @@ def get_frames(vid, n_frames=1):
     frames = []
     v_cap = cv2.VideoCapture(vid)
     if not v_cap.isOpened():
-        print("Failed to open video:", vid)
+        print(f"[utils.py] ERROR - Failed to open video: {vid}")
         return frames, 0
     v_len = int(v_cap.get(cv2.CAP_PROP_FRAME_COUNT))
     if v_len <= 0:
-        print("No frames found in video:", vid)
+        print(f"[utils.py] WARNING - No frames found in video: {vid}")
         v_cap.release()
         return frames, 0
     frame_idx = np.linspace(0, v_len-1, n_frames, dtype=np.int16)
     for idx in range(v_len):
         success, frame = v_cap.read()
         if not success:
-            print(f"Failed to read frame {idx} from video: {vid}")
+            print(f"[utils.py] WARNING - Failed to read frame {idx} from video: {vid}")
             continue
         if idx in frame_idx:
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
