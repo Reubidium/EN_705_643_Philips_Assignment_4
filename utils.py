@@ -134,12 +134,10 @@ def compose_data_transforms(height, width, mean, std):
         transforms.Resize((height, width)),
         transforms.RandomHorizontalFlip(p=0.5),
         transforms.RandomAffine(degrees=0, translate=(0.1, 0.1)),
-        transforms.ToTensor(),
         transforms.Normalize(mean, std),
     ])
     val_test_transforms = transforms.Compose([
         transforms.Resize((height, width)),
-        transforms.ToTensor(),
         transforms.Normalize(mean, std),
     ])
     return train_transforms, val_test_transforms

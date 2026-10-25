@@ -67,13 +67,19 @@ class VideoDataset(Dataset):
         
         # Get the label associated with the video
         fr_label = self.dataset[idx][1]
-        
-        # Apply transforms to each frame if provided, else keep original images
-        fr_imgs_trans = [self.transforms(fr_img) for fr_img in fr_imgs] if self.transforms else fr_imgs
 
-        # Stack transformed images into a tensor if available
+        # Convert each frame to a tensor.
+        fr_imgs_trans = [
+            transforms.functional.to_tensor(frame)
+            for frame in fr_imgs
+        ]
+
         if len(fr_imgs_trans) > 0:
             fr_imgs_trans = torch.stack(fr_imgs_trans)
+
+            # Transform the entire clip instead of individual frames and risking inconsistent transformations across frames
+            if self.transforms is not None:
+                fr_imgs_trans = self.transforms(fr_imgs_trans)
 
         return fr_imgs_trans, fr_label
 
