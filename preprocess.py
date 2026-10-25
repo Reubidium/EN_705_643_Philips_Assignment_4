@@ -15,7 +15,7 @@ def process_dataset(dataset_dir: Path, output_dir: Path, n_frames: int = 16, deb
     if not dataset_dir.is_dir():
         raise FileNotFoundError(f"[ERROR] - Dataset directory not found: {dataset_dir}")
 
-    log_path = output_dir / "preprocess_debug.txt"
+    log_path = (Path(__file__).resolve().parent / f"{output_dir.name}_dataset_debug_log.txt")
     if debug:
         output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -80,7 +80,7 @@ def main() -> None:
     parser.add_argument(
         "--debug",
         action="store_true",
-        help="Write progress details to preprocess_debug.txt in the output directory.",
+        help="Write progress details to a dataset debug log in the repository root.",
     )
     args = parser.parse_args()
 
@@ -91,7 +91,8 @@ def main() -> None:
         debug=args.debug,
     )
     if args.debug:
-        print(f"Debug log written to: {args.output_dir / 'preprocess_debug.txt'}")
+        log_path = (project_dir / f"{args.output_dir.name}_dataset_debug_log.txt")
+        print(f"Debug log written to: {log_path}")
 
 
 if __name__ == "__main__":
