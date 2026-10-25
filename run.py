@@ -136,6 +136,38 @@ def main(args):
     # Data loading parameters
     num_workers = args.num_workers
 
+    # Print the configuration
+    print(
+        "\n"
+        "========== Run Configuration ==========\n"
+        "Dataset parameters\n"
+        f"  Frame directory:       {frame_dir}\n"
+        f"  Training split:        {tr_size}\n"
+        f"  Test split:            {ts_size}\n"
+        f"  Frames per video:      {fr_per_vid}\n"
+        f"  Number of classes:     {n_classes}\n"
+        "\n"
+        "Model parameters\n"
+        f"  Model type:            {model_type}\n"
+        f"  RNN hidden size:       {rnn_hidden_size}\n"
+        f"  RNN layers:            {rnn_n_layers}\n"
+        f"  Dropout:               {dropout}\n"
+        f"  Pretrained backbone:   {pretrained}\n"
+        f"  CNN backbone:          {cnn_backbone}\n"
+        f"  Checkpoint:            {ckpt}\n"
+        "\n"
+        "Training parameters\n"
+        f"  Mode:                  {mode}\n"
+        f"  Batch size:            {batch_size}\n"
+        f"  Epochs:                {n_epochs}\n"
+        f"  Learning rate:         {learning_rate}\n"
+        f"  Device:                {device}\n"
+        "\n"
+        "Data loading parameters\n"
+        f"  Training workers:      {num_workers}\n"
+        "=======================================\n"
+    )
+
     # Load transformation statistics and create data augmentation transforms
     h, w, mean, std = transform_stats(model_type)
     tr_transforms, val_ts_transforms = compose_data_transforms(h, w, mean, std)
