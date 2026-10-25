@@ -131,7 +131,7 @@ def trainer(args):
     batch_size = args.batch_size
     n_epochs = args.n_epochs
     learning_rate = args.learning_rate
-    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    device = torch.device('cuda:0' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu')
 
     # Load dataset and generate train/validation/test splits
     vid_dataset, label_dict = load_dataset(frame_dir)
