@@ -230,12 +230,15 @@ def collate_fn_rnn(batch):
     """
     # Unzip the batch into image tensors and labels
     imgs_batch, label_batch = list(zip(*batch))
+
+    # Record real lengths BEFORE adding padding.
+    lengths = torch.tensor(
+        [len(clip) for clip in imgs_batch],
+        dtype=torch.long,
+    )
     
-    # Filter out any samples that have no frames
-    valid_samples = [(imgs, label) for imgs, label in zip(imgs_batch, label_batch) if len(imgs) > 0]
-    if not valid_samples:
-        return None, None
-    imgs_batch, label_batch = zip(*valid_samples)
+    if (lengths == 0).any():
+        raise ValueError("A video has no frames; check preprocessing.")
     
     # Pad the video frame tensors along the time dimension (T)
     # Resulting shape: (batch_size, max_T, C, H, W)
@@ -244,4 +247,4 @@ def collate_fn_rnn(batch):
     # Convert labels to a tensor
     labels_tensor = torch.tensor(label_batch)
     
-    return padded_imgs, labels_tensor
+    return padded_imgs, labels_tensor, lengths

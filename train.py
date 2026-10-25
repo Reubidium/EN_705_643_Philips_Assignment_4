@@ -215,9 +215,9 @@ def get_epoch_loss(model, criterion, dataloader, device, optimizer=None):
     running_loss, running_total_correct_preds = 0.0, 0.0
     len_dataset = len(dataloader.dataset)
 
-    for x_batch, y_batch in tqdm(dataloader):
+    for x_batch, y_batch, lengths in tqdm(dataloader):
         x_batch, y_batch = x_batch.to(device), y_batch.to(device)
-        output = model(x_batch)
+        output = model(x_batch, lengths)
         batch_loss, n_batch_correct_preds = get_batch_loss(criterion, output, y_batch, optimizer)
 
         running_loss += batch_loss

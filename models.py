@@ -97,7 +97,7 @@ class LRCN(nn.Module):
         # Final fully-connected layer to produce logits for each class.
         self.fc = nn.Linear(hidden_size, n_classes)
 
-    def forward(self, x):
+    def forward(self, x, lengths):
         """
         Forward pass for the LRCN model.
         
@@ -110,6 +110,7 @@ class LRCN(nn.Module):
 
         Args:
             x (Tensor): Input tensor of shape (batch_size, time_steps, channels, height, width).
+            lengths (Tensor): A tensor containing the actual lengths of each sequence in the batch.
 
         Returns:
             Tensor: Output logits for each sample in the batch with shape (batch_size, n_classes).
@@ -129,7 +130,13 @@ class LRCN(nn.Module):
             outputs.append(out)
 
         # Concatenate the outputs from all time steps along the time dimension.
-        out = torch.cat(outputs, dim=1).mean(dim=1)
+        out = torch.cat(outputs, dim=1)  # [batch, time, hidden]
+        lengths = lengths.to(out.device)
+        positions = torch.arange(out.size(1), device=out.device)
+        # True for real frames, False for padding.
+        valid = positions[None, :] < lengths[:, None]
+        out = out.masked_fill(~valid.unsqueeze(-1), 0)
+        out = out.sum(dim=1) / lengths[:, None]
         
         # Apply dropout to the summary
         out = self.dropout(out)
