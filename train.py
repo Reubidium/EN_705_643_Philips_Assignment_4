@@ -18,6 +18,8 @@ import os
 import copy
 from tqdm import tqdm
 import torch
+import csv
+from datetime import datetime
 
 def train(dataloaders, model, criterion, optimizer, scheduler, device, optim_model_wts_dir, n_epochs=30):
     """
@@ -50,6 +52,24 @@ def train(dataloaders, model, criterion, optimizer, scheduler, device, optim_mod
     best_model_wts = copy.deepcopy(model.state_dict())
     best_val_acc = 0.0
 
+    # Initialize training logs and metrics
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+    metrics_path = os.path.join(
+        optim_model_wts_dir, f"metrics_{timestamp}.csv"
+    )
+    with open(metrics_path, "x", newline="", encoding="utf-8") as metrics_file:
+        writer = csv.writer(metrics_file)
+        writer.writerow([
+            "epoch",
+            "learning_rate",
+            "train_loss",
+            "train_accuracy",
+            "val_loss",
+            "val_accuracy",
+        ])
+    print(f"Saving metrics to: {metrics_path}")
+
+    # Begin training loop
     for epoch in range(n_epochs):
         current_lr = get_learning_rate(optimizer)
         print('Epoch {}/{}; Current learning rate {}'.format(epoch+1, n_epochs, current_lr))
@@ -74,13 +94,30 @@ def train(dataloaders, model, criterion, optimizer, scheduler, device, optim_mod
         loss_hist['val'].append(val_loss)
         acc_hist['val'].append(val_accuracy)
 
+        # Log metrics to CSV
+        with open(metrics_path, "a", newline="", encoding="utf-8") as metrics_file:
+            writer = csv.writer(metrics_file)
+            writer.writerow([
+                epoch + 1,
+                current_lr,
+                train_loss,
+                train_accuracy,
+                val_loss,
+                val_accuracy,
+            ])
+
         # Update learning rate based on validation loss
         scheduler.step(val_loss)
         if current_lr != get_learning_rate(optimizer):
             print('Loading best model weights!')
             model.load_state_dict(best_model_wts)
 
-        print("train loss: {:.6f}, val loss: {:.6f}, accuracy: {:.2f}".format(train_loss, val_loss, 100*val_accuracy))
+        print(
+            f"train loss: {train_loss:.6f}, "
+            f"train accuracy: {100 * train_accuracy:.2f}%, "
+            f"val loss: {val_loss:.6f}, "
+            f"val accuracy: {100 * val_accuracy:.2f}%"
+        )
         print("-" * 60)
         print()
 
