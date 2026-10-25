@@ -36,7 +36,7 @@ import numpy as np
 from video_datasets import VideoDataset, load_dataset, dataset_split
 from utils import transform_stats, compose_data_transforms, train_val_dloaders, test_dloaders
 from models import LRCN
-from train import train
+from train import create_run_directory, train
 from test import test, get_test_report, get_confusion_matrix
 
 def args_parser():
@@ -196,12 +196,25 @@ def main(args):
         loss_func = nn.CrossEntropyLoss(reduction='sum')
         opt = optim.Adam(model.parameters(), lr=learning_rate)
         lr_scheduler = ReduceLROnPlateau(opt, mode='min', factor=0.5, patience=5)
-        os.makedirs("./models", exist_ok=True)
-        optim_model_dir = './models'
+        
+        # Create a directory to save the best model weights and metrics
+        run_dir = create_run_directory()
+        optim_model_dir = os.path.join(run_dir, 'models')
+        print(f"Saving run outputs to: {run_dir}")
 
         # Main training procedure
         model.to(device)
-        model, loss_hist, acc_hist = train(dataloaders, model, loss_func, opt, lr_scheduler, device, optim_model_dir, n_epochs)
+        model, loss_hist, acc_hist = train(
+            dataloaders,
+            model,
+            loss_func,
+            opt,
+            lr_scheduler,
+            device,
+            optim_model_dir,
+            n_epochs,
+            metrics_dir=run_dir,
+        )
 
     elif mode == 'eval':
         print(

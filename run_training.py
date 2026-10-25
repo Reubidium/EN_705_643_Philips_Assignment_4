@@ -46,7 +46,7 @@ from torch.optim.lr_scheduler import CosineAnnealingLR, ReduceLROnPlateau
 from video_datasets import VideoDataset, load_dataset, dataset_split
 from utils import transform_stats, compose_data_transforms, compose_dataloaders
 from models import LRCN
-from train import train
+from train import create_run_directory, train
 
 def args_parser():
     """
@@ -158,11 +158,24 @@ def trainer(args):
     loss_func = nn.CrossEntropyLoss(reduction='sum')
     opt = optim.Adam(model.parameters(), lr=learning_rate)
     lr_scheduler = ReduceLROnPlateau(opt, mode='min', factor=0.5, patience=5, verbose=1)
-    os.makedirs("./models", exist_ok=True)
-    optim_model_dir = './models'
+    
+    # Create a directory to save the best model weights and metrics
+    run_dir = create_run_directory()
+    optim_model_dir = os.path.join(run_dir, 'models')
+    print(f"Saving run outputs to: {run_dir}")
 
     # Execute the main training procedure and update the model
-    model, loss_hist, acc_hist = train(dataloaders, model, loss_func, opt, lr_scheduler, device, optim_model_dir, n_epochs)
+    model, loss_hist, acc_hist = train(
+        dataloaders,
+        model,
+        loss_func,
+        opt,
+        lr_scheduler,
+        device,
+        optim_model_dir,
+        n_epochs,
+        metrics_dir=run_dir,
+    )
 
 if __name__ == "__main__":
     args = args_parser()

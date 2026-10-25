@@ -21,7 +21,25 @@ import torch
 import csv
 from datetime import datetime
 
-def train(dataloaders, model, criterion, optimizer, scheduler, device, optim_model_wts_dir, n_epochs=30):
+def create_run_directory(runs_dir='./runs'):
+    """Create a timestamped run directory with a nested models directory."""
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+    run_dir = os.path.join(runs_dir, timestamp)
+    os.makedirs(os.path.join(run_dir, "models"))
+    return run_dir
+
+
+def train(
+    dataloaders,
+    model,
+    criterion,
+    optimizer,
+    scheduler,
+    device,
+    optim_model_wts_dir,
+    n_epochs=30,
+    metrics_dir=None,
+):
     """
     Train and validate the model over a given number of epochs.
     
@@ -38,6 +56,7 @@ def train(dataloaders, model, criterion, optimizer, scheduler, device, optim_mod
         scheduler (torch.optim.lr_scheduler): Learning rate scheduler, which adjusts the learning rate based on validation loss.
         device (torch.device): Device (CPU or GPU) on which to perform training.
         optim_model_wts_dir (str): Directory to save the best model weights.
+        metrics_dir (str, optional): Directory for the metrics CSV. Defaults to the model directory.
         n_epochs (int, optional): Number of training epochs. Default is 30.
 
     Returns:
@@ -53,10 +72,7 @@ def train(dataloaders, model, criterion, optimizer, scheduler, device, optim_mod
     best_val_acc = 0.0
 
     # Initialize training logs and metrics
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-    metrics_path = os.path.join(
-        optim_model_wts_dir, f"metrics_{timestamp}.csv"
-    )
+    metrics_path = os.path.join(metrics_dir or optim_model_wts_dir, "metrics.csv")
     with open(metrics_path, "x", newline="", encoding="utf-8") as metrics_file:
         writer = csv.writer(metrics_file)
         writer.writerow([
