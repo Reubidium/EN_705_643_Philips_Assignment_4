@@ -17,9 +17,10 @@ from PIL import Image
 
 import os
 import glob
+import re
 from tqdm import tqdm
 import numpy as np
-from sklearn.model_selection import StratifiedShuffleSplit
+from sklearn.model_selection import GroupShuffleSplit
 from pathlib import Path
 
 
@@ -106,9 +107,9 @@ def load_dataset(frame_dir):
 
 def dataset_split(vid_dataset, tr_ratio, ts_ratio, seed=0):
     """
-    Split the dataset into training, validation, and test sets using stratified sampling.
+    Split the dataset into training, validation, and test sets using group shuffle sampling.
     
-    This function uses StratifiedShuffleSplit to ensure that each split has a representative
+    This function uses GroupShuffleSplit to ensure that each split has a representative
     distribution of classes.
     
     Args:
@@ -123,26 +124,57 @@ def dataset_split(vid_dataset, tr_ratio, ts_ratio, seed=0):
             - val_dataset (list): List of (video_path, label) tuples for the validation set.
             - ts_dataset (list): List of (video_path, label) tuples for the test set.
     """
+
+    # Helper function to extract the group number from a UCF50 video filename.
+    def get_group_number(vid_path):
+        video_name = os.path.basename(vid_path)
+        group_number = re.search(r'_g(\d+)_c\d+$', video_name)
+        if group_number is None:
+            raise ValueError(f"Cannot find a UCF50 group ID in: {video_name}")
+        return int(group_number.group(1))
+
     vid_paths = np.array([vid_path for vid_path in vid_dataset.keys()])
+    vid_groups = np.array([get_group_number(vid_path) for vid_path in vid_paths])   # example: [1, 1, 1, 1, 2, 2, 2, 2]
     vid_labels = np.array([vid_label for vid_label in vid_dataset.values()])
+    
+    
     print('Splitting train/validation/test datasets....')
 
-    # Test split using StratifiedShuffleSplit
-    ts_spliter = StratifiedShuffleSplit(n_splits=1, test_size=ts_ratio, random_state=seed)
-    for tr_val_idx, ts_idx in ts_spliter.split(vid_paths, vid_labels):
-        ts_paths, ts_labels = vid_paths[ts_idx], vid_labels[ts_idx]
-        tr_val_paths, tr_val_labels = vid_paths[tr_val_idx], vid_labels[tr_val_idx]
-    ts_dataset = [(ts_path, ts_label) for ts_path, ts_label in zip(ts_paths, ts_labels)]
+    # Test split using GroupShuffleSplit
+    ts_splitter = GroupShuffleSplit(
+        n_splits=1,
+        test_size=ts_ratio,
+        random_state=seed
+    )
+    tr_val_idx, ts_idx = next(
+        ts_splitter.split(vid_paths, vid_labels, groups=vid_groups)
+    )
+    ts_paths, ts_labels = vid_paths[ts_idx], vid_labels[ts_idx]
+    ts_dataset = list(zip(ts_paths, ts_labels))
 
-    # Train/validation split
+    # Train/validation split using GroupShuffleSplit
+    tr_val_paths = vid_paths[tr_val_idx]
+    tr_val_labels = vid_labels[tr_val_idx]
+    tr_val_groups = vid_groups[tr_val_idx]
     val_ratio = 1 - tr_ratio - ts_ratio
     val_wt = val_ratio / (tr_ratio + val_ratio)
-    val_spliter = StratifiedShuffleSplit(n_splits=1, test_size=val_wt, random_state=seed)
-    for tr_idx, val_idx in val_spliter.split(tr_val_paths, tr_val_labels):
-        tr_paths, tr_labels = tr_val_paths[tr_idx], tr_val_labels[tr_idx]
-        val_paths, val_labels = tr_val_paths[val_idx], tr_val_labels[val_idx]
-    tr_dataset = [(tr_path, tr_label) for tr_path, tr_label in zip(tr_paths, tr_labels)]
-    val_dataset = [(val_path, val_label) for val_path, val_label in zip(val_paths, val_labels)]
+
+    val_splitter = GroupShuffleSplit(
+        n_splits=1,
+        test_size=val_wt,
+        random_state=seed
+    )
+    tr_idx, val_idx = next(
+        val_splitter.split(
+            tr_val_paths,
+            tr_val_labels,
+            groups=tr_val_groups
+        )
+    )
+    tr_paths, tr_labels = tr_val_paths[tr_idx], tr_val_labels[tr_idx]
+    tr_dataset = list(zip(tr_paths, tr_labels))
+    val_paths, val_labels = tr_val_paths[val_idx], tr_val_labels[val_idx]
+    val_dataset = list(zip(val_paths, val_labels))
 
     return tr_dataset, val_dataset, ts_dataset
 
