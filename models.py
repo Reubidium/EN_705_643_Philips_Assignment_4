@@ -13,6 +13,7 @@ Classes:
           fully-connected layer to produce class logits.
 """
 
+import torch
 import torch.nn as nn
 from torchvision import models
 
@@ -118,15 +119,20 @@ class LRCN(nn.Module):
         # Process the first frame separately to initialize the LSTM hidden and cell states.
         idx = 0
         y = self.base_model(x[:, idx])
-        _, (hn, cn) = self.rnn(y.unsqueeze(1))
+        out, (hn, cn) = self.rnn(y.unsqueeze(1))
+        outputs = [out]
         
         # Iterate over the remaining frames, feeding each frame's features into the LSTM.
         for idx in range(1, ts):
             y = self.base_model(x[:, idx])
             out, (hn, cn) = self.rnn(y.unsqueeze(1), (hn, cn))
+            outputs.append(out)
+
+        # Concatenate the outputs from all time steps along the time dimension.
+        out = torch.cat(outputs, dim=1).mean(dim=1)
         
-        # Apply dropout to the output of the final time step.
-        out = self.dropout(out[:, -1])
+        # Apply dropout to the summary
+        out = self.dropout(out)
         
         # Pass the final output through the fully-connected layer to get class logits.
         out = self.fc(out)
