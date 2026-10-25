@@ -17,6 +17,7 @@ the following:
     - Loads the pre-generated dataset splits.
     - Creates a DataLoader for the test set.
     - Loads the trained model checkpoint.
+    - Prints the evaluation configuration.
     - Evaluates the model on the test set and prints overall test accuracy.
     
 The module also includes a helper function for parsing command-line arguments.
@@ -136,38 +137,6 @@ def main(args):
     # Data loading parameters
     num_workers = args.num_workers
 
-    # Print the configuration
-    print(
-        "\n"
-        "========== Run Configuration ==========\n"
-        "Dataset parameters\n"
-        f"  Frame directory:       {frame_dir}\n"
-        f"  Training split:        {tr_size}\n"
-        f"  Test split:            {ts_size}\n"
-        f"  Frames per video:      {fr_per_vid}\n"
-        f"  Number of classes:     {n_classes}\n"
-        "\n"
-        "Model parameters\n"
-        f"  Model type:            {model_type}\n"
-        f"  RNN hidden size:       {rnn_hidden_size}\n"
-        f"  RNN layers:            {rnn_n_layers}\n"
-        f"  Dropout:               {dropout}\n"
-        f"  Pretrained backbone:   {pretrained}\n"
-        f"  CNN backbone:          {cnn_backbone}\n"
-        f"  Checkpoint:            {ckpt}\n"
-        "\n"
-        "Training parameters\n"
-        f"  Mode:                  {mode}\n"
-        f"  Batch size:            {batch_size}\n"
-        f"  Epochs:                {n_epochs}\n"
-        f"  Learning rate:         {learning_rate}\n"
-        f"  Device:                {device}\n"
-        "\n"
-        "Data loading parameters\n"
-        f"  Training workers:      {num_workers}\n"
-        "=======================================\n"
-    )
-
     # Load transformation statistics and create data augmentation transforms
     h, w, mean, std = transform_stats(model_type)
     tr_transforms, val_ts_transforms = compose_data_transforms(h, w, mean, std)
@@ -177,6 +146,37 @@ def main(args):
                  n_classes=n_classes, pretrained=pretrained, cnn_model=cnn_backbone)
 
     if mode == 'train':
+        # Print the configuration
+        print(
+            "\n"
+            "========== Training Configuration ==========\n"
+            "Dataset parameters\n"
+            f"  Frame directory:       {frame_dir}\n"
+            f"  Training split:        {tr_size}\n"
+            f"  Test split:            {ts_size}\n"
+            f"  Frames per video:      {fr_per_vid}\n"
+            f"  Number of classes:     {n_classes}\n"
+            "\n"
+            "Model parameters\n"
+            f"  Model type:            {model_type}\n"
+            f"  RNN hidden size:       {rnn_hidden_size}\n"
+            f"  RNN layers:            {rnn_n_layers}\n"
+            f"  Dropout:               {dropout}\n"
+            f"  Pretrained backbone:   {pretrained}\n"
+            f"  CNN backbone:          {cnn_backbone}\n"
+            f"  Checkpoint:            {ckpt}\n"
+            "\n"
+            "Training parameters\n"
+            f"  Mode:                  {mode}\n"
+            f"  Batch size:            {batch_size}\n"
+            f"  Epochs:                {n_epochs}\n"
+            f"  Learning rate:         {learning_rate}\n"
+            f"  Device:                {device}\n"
+            "\n"
+            "Data loading parameters\n"
+            f"  Training workers:      {num_workers}\n"
+            "=======================================\n"
+        )
         # Load dataset and split into train/validation/test
         vid_dataset, label_dict = load_dataset(frame_dir)
         tr_split, val_split, ts_split = dataset_split(vid_dataset, tr_size, ts_size)
@@ -204,6 +204,18 @@ def main(args):
         model, loss_hist, acc_hist = train(dataloaders, model, loss_func, opt, lr_scheduler, device, optim_model_dir, n_epochs)
 
     elif mode == 'eval':
+        print(
+            "\n"
+            "========== Evaluation Configuration ==========\n"
+            f"  Checkpoint:        {ckpt}\n"
+            f"  Model type:        {model_type}\n"
+            f"  Number of classes: {n_classes}\n"
+            f"  Frames per video:  {fr_per_vid}\n"
+            f"  Batch size:        {batch_size}\n"
+            f"  Device:            {device}\n"
+            "==============================================\n"
+        )
+
         # Load saved dataset splits
         splits = np.load('./splits.npy', allow_pickle=True)
         ts_split = splits.item()['test']
@@ -211,7 +223,7 @@ def main(args):
 
         # Create PyTorch Dataset and DataLoader for the test set
         ts_dataset = VideoDataset(ts_split, fr_per_vid, val_ts_transforms)
-        dataloaders = test_dloaders(ts_dataset, batch_size, model_type)
+        dataloaders = test_dloaders(ts_dataset, batch_size, num_workers, model_type)
 
         # Load the trained model checkpoint
         model.load_state_dict(torch.load(args.ckpt))

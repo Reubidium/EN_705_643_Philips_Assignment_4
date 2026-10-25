@@ -167,17 +167,17 @@ def train_val_dloaders(train_dataset, val_dataset, batch_size, num_workers, mode
         train_dl = DataLoader(train_dataset, batch_size=batch_size,
                               shuffle=True, collate_fn=collate_fn_rnn, num_workers=num_workers, persistent_workers=(num_workers > 0))
         val_dl = DataLoader(val_dataset, batch_size=2 * batch_size,
-                            shuffle=False, collate_fn=collate_fn_rnn)
+                            shuffle=False, collate_fn=collate_fn_rnn, num_workers=num_workers, persistent_workers=(num_workers > 0))
     else:
         train_dl = DataLoader(train_dataset, batch_size=batch_size,
                               shuffle=True, collate_fn=collate_fn_r3d_18, num_workers=num_workers, persistent_workers=(num_workers > 0))
         val_dl = DataLoader(val_dataset, batch_size=2 * batch_size,
-                            shuffle=False, collate_fn=collate_fn_r3d_18)
+                            shuffle=False, collate_fn=collate_fn_r3d_18, num_workers=num_workers, persistent_workers=(num_workers > 0))
     dataloaders = {'train': train_dl, 'val': val_dl}
     return dataloaders
 
 
-def test_dloaders(test_dataset, batch_size, model='lrcn'):
+def test_dloaders(test_dataset, batch_size, num_workers, model='lrcn'):
     """
     Create a DataLoader for the test dataset.
 
@@ -187,6 +187,7 @@ def test_dloaders(test_dataset, batch_size, model='lrcn'):
     Args:
         test_dataset (Dataset): PyTorch Dataset for test data.
         batch_size (int): Number of samples per batch.
+        num_workers (int): Number of worker processes for data loading.
         model (str): Model type; 'lrcn' for RNN-based models, otherwise for 3D CNNs.
 
     Returns:
@@ -194,10 +195,10 @@ def test_dloaders(test_dataset, batch_size, model='lrcn'):
     """
     if model == "lrcn":
         test_dl = DataLoader(test_dataset, batch_size=2 * batch_size,
-                             shuffle=False, collate_fn=collate_fn_rnn)
+                             shuffle=False, collate_fn=collate_fn_rnn, num_workers=num_workers, persistent_workers=(num_workers > 0))
     else:
         test_dl = DataLoader(test_dataset, batch_size=2 * batch_size,
-                             shuffle=False, collate_fn=collate_fn_r3d_18)
+                             shuffle=False, collate_fn=collate_fn_r3d_18, num_workers=num_workers, persistent_workers=(num_workers > 0))
     dataloaders = {'test': test_dl}
     return dataloaders
 
