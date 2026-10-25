@@ -6,5 +6,7 @@ python run.py \
     --model_type lrcn \
     --n_classes 50 \
     --fr_per_vid 16 \
-    --batch_size 4 \
-    --mode 'train'
+    --batch_size 16 \
+    --mode 'train' \
+    --n_epochs 30 \
+    --num_workers 4
