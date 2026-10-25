@@ -145,7 +145,7 @@ def compose_data_transforms(height, width, mean, std):
     return train_transforms, val_test_transforms
 
 
-def train_val_dloaders(train_dataset, val_dataset, batch_size, model='lrcn'):
+def train_val_dloaders(train_dataset, val_dataset, batch_size, num_workers, model='lrcn'):
     """
     Create DataLoaders for training and validation datasets.
 
@@ -157,6 +157,7 @@ def train_val_dloaders(train_dataset, val_dataset, batch_size, model='lrcn'):
         train_dataset (Dataset): PyTorch Dataset for training data.
         val_dataset (Dataset): PyTorch Dataset for validation data.
         batch_size (int): Number of samples per batch.
+        num_workers (int): Number of worker processes for data loading.
         model (str): Model type; 'lrcn' for RNN-based models, otherwise for 3D CNNs.
 
     Returns:
@@ -164,12 +165,12 @@ def train_val_dloaders(train_dataset, val_dataset, batch_size, model='lrcn'):
     """
     if model == "lrcn":
         train_dl = DataLoader(train_dataset, batch_size=batch_size,
-                              shuffle=True, collate_fn=collate_fn_rnn)
+                              shuffle=True, collate_fn=collate_fn_rnn, num_workers=num_workers, persistent_workers=(num_workers > 0))
         val_dl = DataLoader(val_dataset, batch_size=2 * batch_size,
                             shuffle=False, collate_fn=collate_fn_rnn)
     else:
         train_dl = DataLoader(train_dataset, batch_size=batch_size,
-                              shuffle=True, collate_fn=collate_fn_r3d_18)
+                              shuffle=True, collate_fn=collate_fn_r3d_18, num_workers=num_workers, persistent_workers=(num_workers > 0))
         val_dl = DataLoader(val_dataset, batch_size=2 * batch_size,
                             shuffle=False, collate_fn=collate_fn_r3d_18)
     dataloaders = {'train': train_dl, 'val': val_dl}

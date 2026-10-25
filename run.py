@@ -83,6 +83,7 @@ def args_parser():
     parser.add_argument('-d', '--dropout', type=float, default=0.1, help='Dropout rate for regularization')
     parser.add_argument('-lr', '--learning_rate', type=float, default=3e-5, help='Learning rate for model training')
     parser.add_argument('-ne', '--n_epochs', type=int, default=30, help='Number of training epochs')
+    parser.add_argument('--num_workers', type=int, default=0, help='Number of workers for data loading (default: 0)')
 
     args = parser.parse_args()
     return args
@@ -132,6 +133,9 @@ def main(args):
     learning_rate = args.learning_rate
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu')
 
+    # Data loading parameters
+    num_workers = args.num_workers
+
     # Load transformation statistics and create data augmentation transforms
     h, w, mean, std = transform_stats(model_type)
     tr_transforms, val_ts_transforms = compose_data_transforms(h, w, mean, std)
@@ -154,7 +158,7 @@ def main(args):
         # Create PyTorch Datasets and DataLoaders for train and validation
         tr_dataset = VideoDataset(tr_split, fr_per_vid, tr_transforms)
         val_dataset = VideoDataset(val_split, fr_per_vid, val_ts_transforms)
-        dataloaders = train_val_dloaders(tr_dataset, val_dataset, batch_size, model_type)
+        dataloaders = train_val_dloaders(tr_dataset, val_dataset, batch_size, num_workers, model_type)
 
         # Define the loss function, optimizer, and learning rate scheduler
         loss_func = nn.CrossEntropyLoss(reduction='sum')
