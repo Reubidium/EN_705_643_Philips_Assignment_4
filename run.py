@@ -178,6 +178,10 @@ def main(args):
             "=======================================\n"
         )
         # Load dataset and split into train/validation/test
+        run_dir = create_run_directory()
+        optim_model_dir = os.path.join(run_dir, 'models')
+        print(f"Saving run outputs to: {run_dir}")
+
         vid_dataset, label_dict = load_dataset(frame_dir)
         tr_split, val_split, ts_split = dataset_split(vid_dataset, tr_size, ts_size)
 
@@ -185,7 +189,8 @@ def main(args):
         splits = {'train': np.array(tr_split),
                   'val': np.array(val_split),
                   'test': np.array(ts_split)}
-        np.save('./splits.npy', splits)
+        splits_path = os.path.join(run_dir, 'splits.npy')
+        np.save(splits_path, splits)
 
         # Create PyTorch Datasets and DataLoaders for train and validation
         tr_dataset = VideoDataset(tr_split, fr_per_vid, tr_transforms)
@@ -196,11 +201,6 @@ def main(args):
         loss_func = nn.CrossEntropyLoss(reduction='sum')
         opt = optim.Adam(model.parameters(), lr=learning_rate)
         lr_scheduler = ReduceLROnPlateau(opt, mode='min', factor=0.5, patience=5)
-        
-        # Create a directory to save the best model weights and metrics
-        run_dir = create_run_directory()
-        optim_model_dir = os.path.join(run_dir, 'models')
-        print(f"Saving run outputs to: {run_dir}")
 
         # Main training procedure
         model.to(device)
@@ -230,7 +230,9 @@ def main(args):
         )
 
         # Load saved dataset splits
-        splits = np.load('./splits.npy', allow_pickle=True)
+        run_dir = os.path.dirname(os.path.dirname(os.path.abspath(ckpt)))
+        splits_path = os.path.join(run_dir, 'splits.npy')
+        splits = np.load(splits_path, allow_pickle=True)
         ts_split = splits.item()['test']
         ts_split = [(sample[0], int(sample[1])) for sample in ts_split]
 
