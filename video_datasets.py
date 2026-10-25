@@ -20,6 +20,7 @@ import glob
 from tqdm import tqdm
 import numpy as np
 from sklearn.model_selection import StratifiedShuffleSplit
+from pathlib import Path
 
 
 class VideoDataset(Dataset):
@@ -55,8 +56,9 @@ class VideoDataset(Dataset):
             tuple: (frames_tensor, label) where frames_tensor is a tensor of shape (T, C, H, W)
                    with T being the number of frames (up to fr_per_vid) and label is an integer.
         """
-        # Get all JPEG frame paths from the video directory and select up to fr_per_vid frames
+        # Get all JPEG frame paths from the video directory and select up to fr_per_vid frames. Sort the frame paths based on the frame number extracted from the filename.
         fr_paths = glob.glob(self.dataset[idx][0] + '/*.jpg')
+        fr_paths = sorted(fr_paths, key=lambda captured_frame_path : int(Path(captured_frame_path).stem[len("frame"):]))
         fr_paths = fr_paths[:self.fpv]
         
         # Open images using PIL
