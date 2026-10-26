@@ -2,4 +2,5 @@ splits.npy
 UCF50
 UCF50.rar
 UCF50_Captured_Frames/
+runs/
 **/__pycache__/
