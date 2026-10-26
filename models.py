@@ -73,7 +73,8 @@ class LRCN(nn.Module):
         elif cnn_model == 'resnet34':
             base_cnn = models.resnet34(pretrained=pretrained)
         elif cnn_model == 'resnet50':
-            base_cnn = models.resnet50(pretrained=pretrained)
+            weights = models.ResNet50_Weights.IMAGENET1K_V2 if pretrained else None
+            base_cnn = models.resnet50(weights=weights)
         elif cnn_model == 'resnet101':
             base_cnn = models.resnet101(pretrained=pretrained)
         elif cnn_model == 'resnet152':
