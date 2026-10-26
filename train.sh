@@ -9,5 +9,6 @@ python run.py \
     --fr_per_vid 16 \
     --batch_size 8 \
     --mode 'train' \
-    --n_epochs 30 \
-    --num_workers 4
+    --n_epochs 100 \
+    --num_workers 4 \
+    --fine_tune_last_block

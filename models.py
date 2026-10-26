@@ -64,7 +64,7 @@ class LRCN(nn.Module):
     Raises:
         ValueError: If the specified cnn_model is not supported.
     """
-    def __init__(self, hidden_size, n_layers, dropout_rate, n_classes, pretrained=True, cnn_model='resnet34'):
+    def __init__(self, hidden_size, n_layers, dropout_rate, n_classes, pretrained=True, cnn_model='resnet34', fine_tune_last_block=False):
         super(LRCN, self).__init__()
 
         # Set up the ResNet backbone as a 2D CNN feature extractor.
@@ -88,6 +88,12 @@ class LRCN(nn.Module):
         # Replace the original fc layer with an identity mapping so that raw features are returned.
         base_cnn.fc = Identity()
         self.base_model = base_cnn
+
+        # Optionally freeze the early layers of the CNN and only fine-tune the last block (layer4) along with the LSTM and classifier.
+        self.fine_tune_last_block = fine_tune_last_block
+        if self.fine_tune_last_block:
+            self.base_model.requires_grad_(False)
+            self.base_model.layer4.requires_grad_(True)
 
         # Define the LSTM to process the sequence of frame features.
         self.rnn = nn.LSTM(num_features, hidden_size, n_layers, batch_first=True)
@@ -145,3 +151,15 @@ class LRCN(nn.Module):
         # Pass the final output through the fully-connected layer to get class logits.
         out = self.fc(out)
         return out
+
+    def train(self, mode=True):
+        super().train(mode)
+
+        if mode and self.fine_tune_last_block:
+            # Use stored BatchNorm statistics throughout the CNN.
+            self.base_model.eval()
+
+            # Allow the final CNN block's statistics to update.
+            self.base_model.layer4.train()
+
+        return self

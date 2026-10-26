@@ -78,6 +78,7 @@ def args_parser():
     parser.add_argument('-p', '--pretrained', help='Use pretrained 2D CNN backbone', default=True)
     parser.add_argument('-rhs', '--rnn_hidden_size', type=int, default=100, help='Number of neurons in the RNN/LSTM hidden layer')
     parser.add_argument('-rnl', '--rnn_n_layers', type=int, default=1, help='Number of RNN/LSTM layers')
+    parser.add_argument('--fine_tune_last_block', action='store_true', help='Freeze early CNN layers; train layer4, LSTM, and classifier (default: False)', default=False)
 
     parser.add_argument('-m', '--mode', type=str, default='train', help="Either 'train' or 'eval'", required=True)
     parser.add_argument('-bs', '--batch_size', type=int, help='Mini-batch size', required=True)
@@ -126,6 +127,7 @@ def main(args):
     pretrained = args.pretrained
     cnn_backbone = args.cnn_backbone
     ckpt = args.ckpt
+    fine_tune_last_block = args.fine_tune_last_block
 
     # Training parameters
     mode = args.mode
@@ -143,7 +145,7 @@ def main(args):
 
     # Initialize the model (LRCN)
     model = LRCN(hidden_size=rnn_hidden_size, n_layers=rnn_n_layers, dropout_rate=dropout,
-                 n_classes=n_classes, pretrained=pretrained, cnn_model=cnn_backbone)
+                 n_classes=n_classes, pretrained=pretrained, cnn_model=cnn_backbone, fine_tune_last_block=fine_tune_last_block)
 
     if mode == 'train':
         # Print the configuration
@@ -151,30 +153,31 @@ def main(args):
             "\n"
             "========== Training Configuration ==========\n"
             "Dataset parameters\n"
-            f"  Frame directory:       {frame_dir}\n"
-            f"  Training split:        {tr_size}\n"
-            f"  Test split:            {ts_size}\n"
-            f"  Frames per video:      {fr_per_vid}\n"
-            f"  Number of classes:     {n_classes}\n"
+            f"  Frame directory:            {frame_dir}\n"
+            f"  Training split:             {tr_size}\n"
+            f"  Test split:                 {ts_size}\n"
+            f"  Frames per video:           {fr_per_vid}\n"
+            f"  Number of classes:          {n_classes}\n"
             "\n"
             "Model parameters\n"
-            f"  Model type:            {model_type}\n"
-            f"  RNN hidden size:       {rnn_hidden_size}\n"
-            f"  RNN layers:            {rnn_n_layers}\n"
-            f"  Dropout:               {dropout}\n"
-            f"  Pretrained backbone:   {pretrained}\n"
-            f"  CNN backbone:          {cnn_backbone}\n"
-            f"  Checkpoint:            {ckpt}\n"
+            f"  Model type:                 {model_type}\n"
+            f"  RNN hidden size:            {rnn_hidden_size}\n"
+            f"  RNN layers:                 {rnn_n_layers}\n"
+            f"  Dropout:                    {dropout}\n"
+            f"  Pretrained backbone:        {pretrained}\n"
+            f"  CNN backbone:               {cnn_backbone}\n"
+            f"  Freeze CNN except layer4:   {fine_tune_last_block}\n"
+            f"  Checkpoint:                 {ckpt}\n"
             "\n"
             "Training parameters\n"
-            f"  Mode:                  {mode}\n"
-            f"  Batch size:            {batch_size}\n"
-            f"  Epochs:                {n_epochs}\n"
-            f"  Learning rate:         {learning_rate}\n"
-            f"  Device:                {device}\n"
+            f"  Mode:                       {mode}\n"
+            f"  Batch size:                 {batch_size}\n"
+            f"  Epochs:                     {n_epochs}\n"
+            f"  Learning rate:              {learning_rate}\n"
+            f"  Device:                     {device}\n"
             "\n"
             "Data loading parameters\n"
-            f"  Training workers:      {num_workers}\n"
+            f"  Training workers:           {num_workers}\n"
             "=======================================\n"
         )
         # Load dataset and split into train/validation/test
@@ -199,7 +202,10 @@ def main(args):
 
         # Define the loss function, optimizer, and learning rate scheduler
         loss_func = nn.CrossEntropyLoss(reduction='sum')
-        opt = optim.Adam(model.parameters(), lr=learning_rate)
+        opt = optim.Adam(
+            (p for p in model.parameters() if p.requires_grad),
+            lr=learning_rate,
+        )
         lr_scheduler = ReduceLROnPlateau(opt, mode='min', factor=0.5, patience=5)
 
         # Main training procedure
@@ -246,9 +252,6 @@ def main(args):
         targets, outputs, accuracy = test(model, dataloaders['test'], device)
 
         print('The overall test accuracy is {:.4f}%.'.format(100 * accuracy))
-        # Optionally, generate a detailed test report or confusion matrix:
-        # print(get_test_report(targets, outputs, all_cats))
-        # print(get_confusion_matrix(targets, outputs, labels_dict, all_cats))
 
     else:
         raise ValueError('The mode argument must be either "train" or "eval".')
