@@ -24,22 +24,51 @@ from sklearn.model_selection import GroupShuffleSplit
 from pathlib import Path
 
 
+def sample_frame_indices(frame_count, sample_count, random_sampling=False):
+    """Select chronological frames spanning a cache without duplicating short clips.
+
+    Training randomly selects one index from each of ``sample_count`` disjoint
+    temporal segments. Evaluation uses fixed, uniformly spaced indices including
+    the first and last frames when selecting at least two frames. Torch's RNG is
+    used so DataLoader worker seeds also control temporal augmentation.
+    """
+    if frame_count < 0:
+        raise ValueError("frame_count must be nonnegative")
+    if sample_count < 1:
+        raise ValueError("sample_count must be positive")
+    if frame_count <= sample_count:
+        return list(range(frame_count))
+    if not random_sampling:
+        return torch.linspace(0, frame_count - 1, steps=sample_count).long().tolist()
+
+    boundaries = [index * frame_count // sample_count for index in range(sample_count + 1)]
+    return [
+        torch.randint(start, stop, (1,)).item()
+        for start, stop in zip(boundaries[:-1], boundaries[1:])
+    ]
+
+
 class VideoDataset(Dataset):
     """
     PyTorch Dataset class for loading video data from directories of frame images.
     
-    Each video is represented as a directory containing JPEG images of its frames.
-    The dataset is provided as a dictionary mapping each video directory path to its label.
+    Each video is represented as a directory containing numerically named frame JPEGs.
+    Training resamples the timeline on each access. Validation and test sampling are
+    deterministic, and all spatial/color transforms receive the entire clip at once.
     
     Args:
-        vid_dataset (dict): Dictionary where keys are video directory paths and values are integer labels.
-        fr_per_vid (int): Number of frames per video to load (images are taken in order).
-        transforms (callable, optional): A function/transform to apply to each frame image (e.g., resizing, normalization).
+        vid_dataset (sequence): Pairs of video-directory paths and integer labels.
+        fr_per_vid (int): Maximum frames to load per video, sampled across its cache.
+        transforms (callable, optional): Transform accepting a complete (T, C, H, W) clip.
+        training (bool): Enable random segment sampling. Defaults to deterministic sampling.
     """
-    def __init__(self, vid_dataset, fr_per_vid, transforms=None):
+    def __init__(self, vid_dataset, fr_per_vid, transforms=None, training=False):
+        if fr_per_vid < 1:
+            raise ValueError("fr_per_vid must be positive")
         self.dataset = vid_dataset
         self.fpv = fr_per_vid
         self.transforms = transforms
+        self.training = training
 
     def __len__(self):
         """Return the number of video samples in the dataset."""
@@ -57,31 +86,26 @@ class VideoDataset(Dataset):
             tuple: (frames_tensor, label) where frames_tensor is a tensor of shape (T, C, H, W)
                    with T being the number of frames (up to fr_per_vid) and label is an integer.
         """
-        # Get all JPEG frame paths from the video directory and select up to fr_per_vid frames. Sort the frame paths based on the frame number extracted from the filename.
-        fr_paths = glob.glob(self.dataset[idx][0] + '/*.jpg')
-        fr_paths = sorted(fr_paths, key=lambda captured_frame_path : int(Path(captured_frame_path).stem[len("frame"):]))
-        fr_paths = fr_paths[:self.fpv]
-        
-        # Open images using PIL
-        fr_imgs = [Image.open(fr_path) for fr_path in fr_paths]
-        
-        # Get the label associated with the video
-        fr_label = self.dataset[idx][1]
+        video_path, label = self.dataset[idx]
+        frame_paths = sorted(
+            glob.glob(os.path.join(video_path, '*.jpg')),
+            key=lambda frame_path: int(Path(frame_path).stem[len("frame"):]),
+        )
+        indices = sample_frame_indices(len(frame_paths), self.fpv, self.training)
+        if not indices:
+            raise ValueError(f"A video has no frames; check preprocessing: {video_path}")
 
-        # Convert each frame to a tensor.
-        fr_imgs_trans = [
-            transforms.functional.to_tensor(frame)
-            for frame in fr_imgs
-        ]
+        # Decode only the selected frames, even when the cache contains many more.
+        frames = []
+        for frame_index in indices:
+            with Image.open(frame_paths[frame_index]) as frame:
+                frames.append(transforms.functional.to_tensor(frame.convert("RGB")))
+        clip = torch.stack(frames)
 
-        if len(fr_imgs_trans) > 0:
-            fr_imgs_trans = torch.stack(fr_imgs_trans)
-
-            # Transform the entire clip instead of individual frames and risking inconsistent transformations across frames
-            if self.transforms is not None:
-                fr_imgs_trans = self.transforms(fr_imgs_trans)
-
-        return fr_imgs_trans, fr_label
+        # Sample augmentation settings once for all timesteps to preserve motion.
+        if self.transforms is not None:
+            clip = self.transforms(clip)
+        return clip, label
 
 
 def load_dataset(frame_dir):

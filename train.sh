@@ -12,3 +12,4 @@ python run.py \
     --n_epochs 100 \
     --num_workers 4 \
     --dropout 0.3 \
+    --random_temporal_sampling

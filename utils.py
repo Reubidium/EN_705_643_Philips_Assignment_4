@@ -116,8 +116,9 @@ def compose_data_transforms(height, width, mean, std):
     """
     Compose and return data transforms for training and validation/test datasets.
 
-    The training transforms include data augmentation such as random horizontal flipping and random affine transformations,
-    while the validation/test transforms consist solely of resizing, converting to tensor, and normalizing.
+    Training adds mild crop/scale variation, flipping, translation, and color jitter.
+    VideoDataset calls the pipeline once on the whole tensor clip, so sampled
+    settings are shared by all frames. Validation/test use only resize/normalize.
 
     Args:
         height (int): Desired image height.
@@ -132,6 +133,9 @@ def compose_data_transforms(height, width, mean, std):
     """
     train_transforms = transforms.Compose([
         transforms.Resize((height, width)),
+        transforms.RandomResizedCrop(
+            (height, width), scale=(0.8, 1.0), ratio=(0.9, 1.1),
+        ),
         transforms.RandomHorizontalFlip(p=0.5),
         transforms.RandomAffine(degrees=0, translate=(0.1, 0.1)),
         transforms.ColorJitter(brightness=0.15, contrast=0.15, saturation=0.10),

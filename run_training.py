@@ -64,6 +64,7 @@ def args_parser():
         -trs/--train_size: Proportion of the dataset used for training (default: 0.7).
         -tss/--test_size: Proportion of the dataset used for testing (default: 0.1).
         -fpv/--fr_per_vid: Number of frames per video (default: 16).
+        --random_temporal_sampling: Resample training frames on each visit (default: off).
         -mt/--model_type: Model type, e.g., 'lrcn' (default: 'lrcn').
         -cnn/--cnn_backbone: CNN backbone for feature extraction (default: 'resnet34').
         -p/--pretrained: Use pretrained CNN backbone (default: True).
@@ -79,6 +80,7 @@ def args_parser():
     parser.add_argument('-trs', '--train_size', type=float, default=0.7, help='Train set size')
     parser.add_argument('-tss', '--test_size', type=float, default=0.1, help='Test set size')
     parser.add_argument('-fpv', '--fr_per_vid', type=int, default=16, help='Number of frames per video')
+    parser.add_argument('--random_temporal_sampling', action='store_true',help='Randomly select training frames from time segments on each visit (default: off)')
     parser.add_argument('-nc', '--n_classes', type=int, help='Number of classes for the classification task', required=True)
 
     parser.add_argument('-mt', '--model_type', help='3D CNN or LRCN', default='lrcn')
@@ -142,7 +144,9 @@ def trainer(args):
     tr_transforms, val_ts_transforms = compose_data_transforms(h, w, mean, std)
 
     # Create PyTorch Datasets for each split
-    tr_dataset = VideoDataset(tr_split, fr_per_vid, tr_transforms)
+    tr_dataset = VideoDataset(
+        tr_split, fr_per_vid, tr_transforms, training=args.random_temporal_sampling,
+    )
     val_dataset = VideoDataset(val_split, fr_per_vid, val_ts_transforms)
     ts_dataset = VideoDataset(ts_split, fr_per_vid, val_ts_transforms)
 

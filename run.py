@@ -51,6 +51,7 @@ def args_parser():
         -trs/--train_size: Proportion of data to use for training (default 0.7).
         -tss/--test_size: Proportion of data to use for testing (default 0.1).
         -fpv/--fr_per_vid: Number of frames per video to consider (default 16).
+        --random_temporal_sampling: Resample training frames on each visit (default False).
         -nc/--n_classes: Number of classes for the classification task (required).
         -c/--ckpt: Path for loading a trained model checkpoint.
         -mt/--model_type: Model type, either '3dcnn' or 'lrcn' (default 'lrcn').
@@ -70,6 +71,7 @@ def args_parser():
     parser.add_argument('-trs', '--train_size', type=float, default=0.7, help='Train set size')
     parser.add_argument('-tss', '--test_size', type=float, default=0.1, help='Test set size')
     parser.add_argument('-fpv', '--fr_per_vid', type=int, default=16, help='Number of frames per video')
+    parser.add_argument('--random_temporal_sampling', action='store_true', help='Randomly select training frames from time segments on each visit (default: off)')
     parser.add_argument('-nc', '--n_classes', type=int, help='Number of classes for the classification task', required=True)
 
     parser.add_argument('-c', '--ckpt', help='Path for loading trained model checkpoints')
@@ -157,6 +159,7 @@ def main(args):
             f"  Training split:             {tr_size}\n"
             f"  Test split:                 {ts_size}\n"
             f"  Frames per video:           {fr_per_vid}\n"
+            f"  Random temporal sampling:   {args.random_temporal_sampling}\n"
             f"  Number of classes:          {n_classes}\n"
             "\n"
             "Model parameters\n"
@@ -196,7 +199,9 @@ def main(args):
         np.save(splits_path, splits)
 
         # Create PyTorch Datasets and DataLoaders for train and validation
-        tr_dataset = VideoDataset(tr_split, fr_per_vid, tr_transforms)
+        tr_dataset = VideoDataset(
+            tr_split, fr_per_vid, tr_transforms, training=args.random_temporal_sampling,
+        )
         val_dataset = VideoDataset(val_split, fr_per_vid, val_ts_transforms)
         dataloaders = train_val_dloaders(tr_dataset, val_dataset, batch_size, num_workers, model_type)
 
