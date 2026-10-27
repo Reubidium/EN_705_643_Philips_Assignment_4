@@ -111,18 +111,21 @@ class LRCN(nn.Module):
         The input tensor x is expected to have the shape:
             (batch_size, time_steps, channels, height, width)
         
-        For each time step (frame), the CNN backbone extracts features. These features are then
-        passed through the LSTM sequentially. The output from the last time step is then passed
-        through dropout and the final fully-connected layer to produce the class logits.
+        For each time step, the CNN extracts features only from real frames so that padding
+        cannot affect BatchNorm statistics. Features are passed through the LSTM sequentially.
+        Only real-frame outputs contribute to the mean used by dropout and the classifier.
 
         Args:
             x (Tensor): Input tensor of shape (batch_size, time_steps, channels, height, width).
-            lengths (Tensor): A tensor containing the actual lengths of each sequence in the batch.
+            lengths (Tensor): Positive lengths of each sequence, no greater than x.size(1).
 
         Returns:
             Tensor: Output logits for each sample in the batch with shape (batch_size, n_classes).
         """
-        bs, ts, c, h, w = x.shape  # batch_size, time_steps, channels, height, width
+        bs = x.size(0)
+        # Ignore any tail timesteps that contain only padding.
+        ts = int(lengths.max().item())
+        lengths = lengths.to(x.device)
         
         # Process the first frame separately to initialize the LSTM hidden and cell states.
         idx = 0
@@ -130,15 +133,18 @@ class LRCN(nn.Module):
         out, (hn, cn) = self.rnn(y.unsqueeze(1))
         outputs = [out]
         
-        # Iterate over the remaining frames, feeding each frame's features into the LSTM.
+        # Exclude padded rows before the CNN; masking after the LSTM is too late for BatchNorm.
         for idx in range(1, ts):
-            y = self.base_model(x[:, idx])
+            active = lengths > idx
+            active_features = self.base_model(x[active, idx])
+            # Restore batch order without breaking gradients to the real frames.
+            y = active_features.new_zeros((bs, active_features.size(1)))
+            y[active] = active_features
             out, (hn, cn) = self.rnn(y.unsqueeze(1), (hn, cn))
             outputs.append(out)
 
         # Concatenate the outputs from all time steps along the time dimension.
         out = torch.cat(outputs, dim=1)  # [batch, time, hidden]
-        lengths = lengths.to(out.device)
         positions = torch.arange(out.size(1), device=out.device)
         # True for real frames, False for padding.
         valid = positions[None, :] < lengths[:, None]

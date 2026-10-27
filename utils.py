@@ -134,6 +134,7 @@ def compose_data_transforms(height, width, mean, std):
         transforms.Resize((height, width)),
         transforms.RandomHorizontalFlip(p=0.5),
         transforms.RandomAffine(degrees=0, translate=(0.1, 0.1)),
+        transforms.ColorJitter(brightness=0.15, contrast=0.15, saturation=0.10),
         transforms.Normalize(mean, std),
     ])
     val_test_transforms = transforms.Compose([

@@ -124,9 +124,6 @@ def train(
 
         # Update learning rate based on validation loss
         scheduler.step(val_loss)
-        if current_lr != get_learning_rate(optimizer):
-            print('Loading best model weights!')
-            model.load_state_dict(best_model_wts)
 
         print(
             f"train loss: {train_loss:.6f}, "
