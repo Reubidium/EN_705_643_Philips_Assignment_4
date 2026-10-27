@@ -1,8 +1,8 @@
 #!/bin/bash
 python run.py \
-    --ckpt ./runs/20261026_205442_635036/models/best_model_wts.pt \
-    --cnn_backbone resnet50 \
+    --ckpt "$1" \
+    --cnn_backbone convnext_tiny \
     --n_classes 50 \
-    --fr_per_vid 32 \
+    --fr_per_vid 16 \
     --batch_size 16 \
     --mode eval

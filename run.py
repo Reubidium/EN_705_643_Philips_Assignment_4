@@ -74,11 +74,11 @@ def args_parser():
 
     parser.add_argument('-c', '--ckpt', help='Path for loading trained model checkpoints')
     parser.add_argument('-mt', '--model_type', help='3D CNN or LRCN', default='lrcn')
-    parser.add_argument('-cnn', '--cnn_backbone', default='resnet34', help='2D CNN backbone - options: resnet18, resnet34, resnet50, resnet101, resnet152')
+    parser.add_argument('-cnn', '--cnn_backbone', default='resnet34', help='CNN backbone: resnet18, resnet34, resnet50, resnet101, resnet152, convnext_tiny')
     parser.add_argument('-p', '--pretrained', help='Use pretrained 2D CNN backbone', default=True)
     parser.add_argument('-rhs', '--rnn_hidden_size', type=int, default=100, help='Number of neurons in the RNN/LSTM hidden layer')
     parser.add_argument('-rnl', '--rnn_n_layers', type=int, default=1, help='Number of RNN/LSTM layers')
-    parser.add_argument('--fine_tune_last_block', action='store_true', help='Freeze early CNN layers; train layer4, LSTM, and classifier (default: False)', default=False)
+    parser.add_argument('--fine_tune_last_block', action='store_true', default=False, help='Freeze early CNN stages; train the final stage, LSTM, and classifier')
 
     parser.add_argument('-m', '--mode', type=str, default='train', help="Either 'train' or 'eval'", required=True)
     parser.add_argument('-bs', '--batch_size', type=int, help='Mini-batch size', required=True)
@@ -166,7 +166,7 @@ def main(args):
             f"  Dropout:                    {dropout}\n"
             f"  Pretrained backbone:        {pretrained}\n"
             f"  CNN backbone:               {cnn_backbone}\n"
-            f"  Freeze CNN except layer4:   {fine_tune_last_block}\n"
+            f"  Fine-tune final CNN stage:  {fine_tune_last_block}\n"
             f"  Checkpoint:                 {ckpt}\n"
             "\n"
             "Training parameters\n"
