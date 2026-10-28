@@ -27,8 +27,9 @@ Arguments include:
     -mt/--model_type: Type of model to use, e.g., 'lrcn' (default: 'lrcn').
     -cnn/--cnn_backbone: CNN backbone for feature extraction (default: 'resnet34').
     -p/--pretrained: Whether to use a pretrained CNN backbone (default: True).
-    -rhs/--rnn_hidden_size: Number of neurons in the RNN/LSTM hidden layer (default: 100).
+    -rhs/--rnn_hidden_size: LSTM hidden features per direction (default: 100).
     -rnl/--rnn_n_layers: Number of RNN/LSTM layers (default: 1).
+    --bidirectional: Enable whole-sequence BiLSTM processing (default: off).
     -bs/--batch_size: Mini-batch size (required).
     -d/--dropout: Dropout rate for regularization (default: 0.1).
     -lr/--learning_rate: Learning rate for training (default: 3e-5).
@@ -68,8 +69,9 @@ def args_parser():
         -mt/--model_type: Model type, e.g., 'lrcn' (default: 'lrcn').
         -cnn/--cnn_backbone: CNN backbone for feature extraction (default: 'resnet34').
         -p/--pretrained: Use pretrained CNN backbone (default: True).
-        -rhs/--rnn_hidden_size: Number of neurons in the RNN/LSTM hidden layer (default: 100).
+        -rhs/--rnn_hidden_size: LSTM hidden features per direction (default: 100).
         -rnl/--rnn_n_layers: Number of RNN/LSTM layers (default: 1).
+        --bidirectional: Enable whole-sequence BiLSTM processing (default: off).
         -d/--dropout: Dropout rate (default: 0.1).
         -lr/--learning_rate: Learning rate for training (default: 3e-5).
         -ne/--n_epochs: Number of training epochs (default: 30).
@@ -86,8 +88,9 @@ def args_parser():
     parser.add_argument('-mt', '--model_type', help='3D CNN or LRCN', default='lrcn')
     parser.add_argument('-cnn', '--cnn_backbone', default='resnet34', help='CNN backbone: resnet18, resnet34, resnet50, resnet101, resnet152, convnext_tiny')
     parser.add_argument('-p', '--pretrained', help='Use pretrained 2D CNN backbone', default=True)
-    parser.add_argument('-rhs', '--rnn_hidden_size', type=int, default=100, help='Number of neurons in the RNN/LSTM hidden layer')
+    parser.add_argument('-rhs', '--rnn_hidden_size', type=int, default=100, help='Number of LSTM hidden features per direction')
     parser.add_argument('-rnl', '--rnn_n_layers', type=int, default=1, help='Number of RNN/LSTM layers')
+    parser.add_argument('--bidirectional', action='store_true', help='Use a whole-sequence bidirectional LSTM (default: off)')
 
     parser.add_argument('-bs', '--batch_size', type=int, help='Mini-batch size', required=True)
     parser.add_argument('-d', '--dropout', type=float, default=0.1, help='Dropout rate for regularization')
@@ -125,6 +128,7 @@ def trainer(args):
     model_type = args.model_type
     rnn_hidden_size = args.rnn_hidden_size
     rnn_n_layers = args.rnn_n_layers
+    bidirectional = args.bidirectional
     dropout = args.dropout
     pretrained = args.pretrained
     cnn_backbone = args.cnn_backbone
@@ -154,8 +158,11 @@ def trainer(args):
     dataloaders = compose_dataloaders(tr_dataset, val_dataset, ts_dataset, batch_size, model_type)
 
     # Initialize the LRCN model with the specified parameters
-    model = LRCN(hidden_size=rnn_hidden_size, n_layers=rnn_n_layers, dropout_rate=dropout,
-                 n_classes=n_classes, pretrained=pretrained, cnn_model=cnn_backbone)
+    model = LRCN(
+        hidden_size=rnn_hidden_size, n_layers=rnn_n_layers, dropout_rate=dropout,
+        n_classes=n_classes, pretrained=pretrained, cnn_model=cnn_backbone,
+        bidirectional=bidirectional,
+    )
     model = model.to(device)
 
     # Define the loss function, optimizer, and learning rate scheduler

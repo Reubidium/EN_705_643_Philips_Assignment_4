@@ -15,6 +15,7 @@ Classes:
 
 import torch
 import torch.nn as nn
+from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 from torchvision import models
 
 class Identity(nn.Module):
@@ -52,18 +53,23 @@ class LRCN(nn.Module):
     Dropout is applied before the final fully-connected layer that produces class logits.
 
     Args:
-        hidden_size (int): Number of features in the hidden state of the LSTM.
+        hidden_size (int): Number of hidden features per LSTM direction.
         n_layers (int): Number of recurrent layers in the LSTM.
         dropout_rate (float): Dropout rate applied before the final classification layer.
         n_classes (int): Number of output classes.
         pretrained (bool, optional): Load ImageNet CNN weights. Default is True.
         cnn_model (str, optional): ResNet variant or 'convnext_tiny'. Default is 'resnet34'.
         fine_tune_last_block (bool): Train only the final CNN stage and, for ConvNeXt, its final feature normalization. The LSTM and video classifier stay trainable.
+        bidirectional (bool): Process the complete frame-feature sequence in both
+            directions. Default False preserves the unidirectional architecture.
     
     Raises:
         ValueError: If the specified cnn_model is not supported.
     """
-    def __init__(self, hidden_size, n_layers, dropout_rate, n_classes, pretrained=True, cnn_model='resnet34', fine_tune_last_block=False):
+    def __init__(
+        self, hidden_size, n_layers, dropout_rate, n_classes, pretrained=True,
+        cnn_model='resnet34', fine_tune_last_block=False, bidirectional=False,
+    ):
         super(LRCN, self).__init__()
 
         # Set up the selected 2D CNN feature extractor.
@@ -104,14 +110,19 @@ class LRCN(nn.Module):
             else:
                 self.base_model.layer4.requires_grad_(True)
 
-        # Define the LSTM to process the sequence of frame features.
-        self.rnn = nn.LSTM(num_features, hidden_size, n_layers, batch_first=True)
+        # A BiLSTM needs the complete sequence to learn from later frames.
+        self.bidirectional = bidirectional
+        self.rnn = nn.LSTM(
+            num_features, hidden_size, n_layers, batch_first=True,
+            bidirectional=bidirectional,
+        )
         
         # Define dropout for regularization.
         self.dropout = nn.Dropout(dropout_rate)
         
         # Final fully-connected layer to produce logits for each class.
-        self.fc = nn.Linear(hidden_size, n_classes)
+        num_directions = 2 if bidirectional else 1
+        self.fc = nn.Linear(hidden_size * num_directions, n_classes)
 
     def forward(self, x, lengths):
         """
@@ -120,45 +131,54 @@ class LRCN(nn.Module):
         The input tensor x is expected to have the shape:
             (batch_size, time_steps, channels, height, width)
         
-        For each time step, the CNN extracts features only from real frames so that padding
-        cannot affect BatchNorm statistics. Features are passed through the LSTM sequentially.
-        Only real-frame outputs contribute to the mean used by dropout and the classifier.
+        At each time step, only genuine frames enter the CNN. Their features are
+        collected in chronological order and passed through the LSTM in one
+        complete, packed sequence. Packing excludes padding from both recurrent
+        directions. Only genuine outputs contribute to the temporal mean.
 
         Args:
             x (Tensor): Input tensor of shape (batch_size, time_steps, channels, height, width).
-            lengths (Tensor): Positive lengths of each sequence, no greater than x.size(1).
+            lengths (Tensor): Integer lengths of each sequence, between 1 and x.size(1).
 
         Returns:
             Tensor: Output logits for each sample in the batch with shape (batch_size, n_classes).
+
+        Raises:
+            ValueError: If lengths do not contain one valid positive length per video.
         """
         bs = x.size(0)
-        # Ignore any tail timesteps that contain only padding.
-        ts = int(lengths.max().item())
-        lengths = lengths.to(x.device)
-        
-        # Process the first frame separately to initialize the LSTM hidden and cell states.
-        idx = 0
-        y = self.base_model(x[:, idx])
-        out, (hn, cn) = self.rnn(y.unsqueeze(1))
-        outputs = [out]
-        
-        # Exclude padded rows before the CNN; masking after the LSTM is too late for BatchNorm.
-        for idx in range(1, ts):
-            active = lengths > idx
+        # PyTorch's packing operation requires sequence lengths on the CPU.
+        lengths_cpu = lengths.detach().to(device='cpu', dtype=torch.long)
+        if lengths_cpu.ndim != 1 or lengths_cpu.numel() != bs or bs == 0:
+            raise ValueError('lengths must contain one positive length per video')
+        if (lengths_cpu < 1).any() or (lengths_cpu > x.size(1)).any():
+            raise ValueError('lengths must be between 1 and the number of input frames')
+        ts = int(lengths_cpu.max().item())
+        lengths_device = lengths_cpu.to(x.device)
+
+        # Retain the original per-timestep CNN batches and exclude padded images.
+        features = []
+        for idx in range(ts):
+            active = lengths_device > idx
             active_features = self.base_model(x[active, idx])
             # Restore batch order without breaking gradients to the real frames.
-            y = active_features.new_zeros((bs, active_features.size(1)))
-            y[active] = active_features
-            out, (hn, cn) = self.rnn(y.unsqueeze(1), (hn, cn))
-            outputs.append(out)
+            frame_features = active_features.new_zeros((bs, active_features.size(1)))
+            frame_features[active] = active_features
+            features.append(frame_features)
 
-        # Concatenate the outputs from all time steps along the time dimension.
-        out = torch.cat(outputs, dim=1)  # [batch, time, hidden]
+        sequence = torch.stack(features, dim=1)  # [batch, time, CNN features]
+        packed_features = pack_padded_sequence(
+            sequence, lengths_cpu, batch_first=True, enforce_sorted=False,
+        )
+        packed_outputs, _state = self.rnn(packed_features)
+        out, _lengths = pad_packed_sequence(packed_outputs, batch_first=True)
+
+        # Unpacking restores the original batch order, including unsorted lengths.
         positions = torch.arange(out.size(1), device=out.device)
         # True for real frames, False for padding.
-        valid = positions[None, :] < lengths[:, None]
+        valid = positions[None, :] < lengths_device[:, None]
         out = out.masked_fill(~valid.unsqueeze(-1), 0)
-        out = out.sum(dim=1) / lengths[:, None]
+        out = out.sum(dim=1) / lengths_device[:, None]
         
         # Apply dropout to the summary
         out = self.dropout(out)

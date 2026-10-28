@@ -57,8 +57,9 @@ def args_parser():
         -mt/--model_type: Model type, either '3dcnn' or 'lrcn' (default 'lrcn').
         -cnn/--cnn_backbone: Backbone CNN for 2D feature extraction (default 'resnet34').
         -p/--pretrained: Whether to use a pretrained CNN backbone (default True).
-        -rhs/--rnn_hidden_size: Number of neurons in the RNN/LSTM hidden layer (default 100).
+        -rhs/--rnn_hidden_size: LSTM hidden features per direction (default 100).
         -rnl/--rnn_n_layers: Number of RNN/LSTM layers (default 1).
+        --bidirectional: Enable whole-sequence BiLSTM processing (default off).
         -m/--mode: Mode of operation: 'train' or 'eval' (required).
         -bs/--batch_size: Mini-batch size (required).
         -d/--dropout: Dropout rate for regularization (default 0.1).
@@ -78,8 +79,9 @@ def args_parser():
     parser.add_argument('-mt', '--model_type', help='3D CNN or LRCN', default='lrcn')
     parser.add_argument('-cnn', '--cnn_backbone', default='resnet34', help='CNN backbone: resnet18, resnet34, resnet50, resnet101, resnet152, convnext_tiny')
     parser.add_argument('-p', '--pretrained', help='Use pretrained 2D CNN backbone', default=True)
-    parser.add_argument('-rhs', '--rnn_hidden_size', type=int, default=100, help='Number of neurons in the RNN/LSTM hidden layer')
+    parser.add_argument('-rhs', '--rnn_hidden_size', type=int, default=100, help='Number of LSTM hidden features per direction')
     parser.add_argument('-rnl', '--rnn_n_layers', type=int, default=1, help='Number of RNN/LSTM layers')
+    parser.add_argument('--bidirectional', action='store_true', help='Use a whole-sequence bidirectional LSTM (default: off)')
     parser.add_argument('--fine_tune_last_block', action='store_true', default=False, help='Freeze early CNN stages; train the final stage, LSTM, and classifier')
 
     parser.add_argument('-m', '--mode', type=str, default='train', help="Either 'train' or 'eval'", required=True)
@@ -125,6 +127,7 @@ def main(args):
     model_type = args.model_type
     rnn_hidden_size = args.rnn_hidden_size
     rnn_n_layers = args.rnn_n_layers
+    bidirectional = args.bidirectional
     dropout = args.dropout
     pretrained = args.pretrained
     cnn_backbone = args.cnn_backbone
@@ -146,8 +149,11 @@ def main(args):
     tr_transforms, val_ts_transforms = compose_data_transforms(h, w, mean, std)
 
     # Initialize the model (LRCN)
-    model = LRCN(hidden_size=rnn_hidden_size, n_layers=rnn_n_layers, dropout_rate=dropout,
-                 n_classes=n_classes, pretrained=pretrained, cnn_model=cnn_backbone, fine_tune_last_block=fine_tune_last_block)
+    model = LRCN(
+        hidden_size=rnn_hidden_size, n_layers=rnn_n_layers, dropout_rate=dropout,
+        n_classes=n_classes, pretrained=pretrained, cnn_model=cnn_backbone,
+        fine_tune_last_block=fine_tune_last_block, bidirectional=bidirectional,
+    )
 
     if mode == 'train':
         # Print the configuration
@@ -164,8 +170,9 @@ def main(args):
             "\n"
             "Model parameters\n"
             f"  Model type:                 {model_type}\n"
-            f"  RNN hidden size:            {rnn_hidden_size}\n"
+            f"  RNN hidden size/direction:  {rnn_hidden_size}\n"
             f"  RNN layers:                 {rnn_n_layers}\n"
+            f"  Bidirectional LSTM:         {bidirectional}\n"
             f"  Dropout:                    {dropout}\n"
             f"  Pretrained backbone:        {pretrained}\n"
             f"  CNN backbone:               {cnn_backbone}\n"
@@ -233,6 +240,10 @@ def main(args):
             "========== Evaluation Configuration ==========\n"
             f"  Checkpoint:        {ckpt}\n"
             f"  Model type:        {model_type}\n"
+            f"  CNN backbone:      {cnn_backbone}\n"
+            f"  RNN hidden size/direction: {rnn_hidden_size}\n"
+            f"  RNN layers:        {rnn_n_layers}\n"
+            f"  Bidirectional LSTM: {bidirectional}\n"
             f"  Number of classes: {n_classes}\n"
             f"  Frames per video:  {fr_per_vid}\n"
             f"  Batch size:        {batch_size}\n"
