@@ -64,6 +64,7 @@ def args_parser():
         -bs/--batch_size: Mini-batch size (required).
         -d/--dropout: Dropout rate for regularization (default 0.1).
         -lr/--learning_rate: Learning rate for training (default 3e-5).
+        --weight_decay: AdamW weight decay; zero disables decay (default 0.0).
         -ne/--n_epochs: Number of training epochs (default 30).
     """
     parser = argparse.ArgumentParser(description='Video Classification Training')
@@ -88,10 +89,13 @@ def args_parser():
     parser.add_argument('-bs', '--batch_size', type=int, help='Mini-batch size', required=True)
     parser.add_argument('-d', '--dropout', type=float, default=0.1, help='Dropout rate for regularization')
     parser.add_argument('-lr', '--learning_rate', type=float, default=3e-5, help='Learning rate for model training')
+    parser.add_argument('--weight_decay', type=float, default=0.0, help='AdamW weight decay; use 0 to disable (default: 0.0)')
     parser.add_argument('-ne', '--n_epochs', type=int, default=30, help='Number of training epochs')
     parser.add_argument('--num_workers', type=int, default=0, help='Number of workers for data loading (default: 0)')
 
     args = parser.parse_args()
+    if not 0.0 <= args.weight_decay < float('inf'):
+        parser.error('--weight_decay must be finite and nonnegative')
     return args
 
 def main(args):
@@ -139,7 +143,7 @@ def main(args):
     batch_size = args.batch_size
     n_epochs = args.n_epochs
     learning_rate = args.learning_rate
-    weight_decay = 0.01
+    weight_decay = args.weight_decay
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu')
 
     # Data loading parameters
