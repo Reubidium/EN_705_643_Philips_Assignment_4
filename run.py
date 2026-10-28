@@ -139,6 +139,7 @@ def main(args):
     batch_size = args.batch_size
     n_epochs = args.n_epochs
     learning_rate = args.learning_rate
+    weight_decay = 0.01
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu')
 
     # Data loading parameters
@@ -184,6 +185,8 @@ def main(args):
             f"  Batch size:                 {batch_size}\n"
             f"  Epochs:                     {n_epochs}\n"
             f"  Learning rate:              {learning_rate}\n"
+            "  Optimizer:                  AdamW\n"
+            f"  Weight decay:               {weight_decay}\n"
             f"  Device:                     {device}\n"
             "\n"
             "Data loading parameters\n"
@@ -213,15 +216,14 @@ def main(args):
         dataloaders = train_val_dloaders(tr_dataset, val_dataset, batch_size, num_workers, model_type)
 
         # Define the loss function, optimizer, and learning rate scheduler
+        model.to(device)
         loss_func = nn.CrossEntropyLoss(reduction='sum')
-        opt = optim.Adam(
-            (p for p in model.parameters() if p.requires_grad),
-            lr=learning_rate,
+        opt = optim.AdamW(
+            model.parameters(), lr=learning_rate, weight_decay=weight_decay,
         )
         lr_scheduler = ReduceLROnPlateau(opt, mode='min', factor=0.5, patience=5)
 
         # Main training procedure
-        model.to(device)
         model, loss_hist, acc_hist = train(
             dataloaders,
             model,

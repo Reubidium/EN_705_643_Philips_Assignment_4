@@ -137,6 +137,7 @@ def trainer(args):
     batch_size = args.batch_size
     n_epochs = args.n_epochs
     learning_rate = args.learning_rate
+    weight_decay = 0.01
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu')
 
     # Load dataset and generate train/validation/test splits
@@ -167,7 +168,10 @@ def trainer(args):
 
     # Define the loss function, optimizer, and learning rate scheduler
     loss_func = nn.CrossEntropyLoss(reduction='sum')
-    opt = optim.Adam(model.parameters(), lr=learning_rate)
+    opt = optim.AdamW(
+        model.parameters(), lr=learning_rate, weight_decay=weight_decay,
+    )
+    print(f"Optimizer: AdamW; weight decay: {weight_decay}")
     lr_scheduler = ReduceLROnPlateau(opt, mode='min', factor=0.5, patience=5, verbose=1)
     
     # Create a directory to save the best model weights and metrics
