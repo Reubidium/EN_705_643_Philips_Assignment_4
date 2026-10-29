@@ -2,7 +2,7 @@
 python run.py \
     --frame_dir UCF50_Captured_Frames \
     --train_size 0.60 \
-    --test_size 0.20 \
+    --test_size 0.30 \
     --model_type lrcn \
     --cnn_backbone convnext_tiny \
     --rnn_hidden_size 100 \
@@ -14,11 +14,11 @@ python run.py \
     --fr_per_vid 16 \
     --batch_size 6 \
     --mode 'train' \
-    --n_epochs 100 \
+    --n_epochs 30 \
     --num_workers 4 \
     --dropout 0.3 \
     --learning_rate 3e-5 \
-    --cnn_learning_rate 3e-6 \
+    --cnn_learning_rate 3e-5 \
     --weight_decay 0.0 \
     --label_smoothing 0.0 \
     --random_temporal_sampling \
