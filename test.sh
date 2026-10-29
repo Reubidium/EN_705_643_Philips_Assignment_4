@@ -1,6 +1,6 @@
 #!/bin/bash
 python run.py \
-    --ckpt "$1" \
+    --ckpt ./runs/20261028_205151_248095/models/best_model_wts.pt \
     --cnn_backbone convnext_tiny \
     --rnn_hidden_size 100 \
     --rnn_n_layers 1 \
