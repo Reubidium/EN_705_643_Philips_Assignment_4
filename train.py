@@ -14,15 +14,18 @@ Functions:
     - get_epoch_loss: Computes the average loss and accuracy over an epoch.
 """
 
-import os
 import copy
-from tqdm import tqdm
-import torch
 import csv
 from datetime import datetime
+import os
+
+import torch
+from tqdm import tqdm
+
 from tracking import log_epoch
 
-def create_run_directory(runs_dir='./runs'):
+
+def create_run_directory(runs_dir="./runs"):
     """Create a timestamped run directory with a nested models directory."""
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
     run_dir = os.path.join(runs_dir, timestamp)
@@ -30,6 +33,23 @@ def create_run_directory(runs_dir='./runs'):
     return run_dir
 
 
+def _write_metrics(path, values, mode="a"):
+    """Write one CSV row while preserving newline handling on every platform."""
+    with open(path, mode, newline="", encoding="utf-8") as metrics_file:
+        csv.writer(metrics_file).writerow(values)
+
+
+def _save_checkpoint(model, directory, epoch, wandb_run):
+    """Snapshot the full model and record the newly selected checkpoint."""
+    weights = copy.deepcopy(model.state_dict())
+    torch.save(weights, os.path.join(directory, "best_model_wts.pt"))
+    print(f"Best model weights are updated at epoch {epoch}!")
+    if wandb_run is not None:
+        wandb_run.summary["checkpoint_file"] = "models/best_model_wts.pt"
+    return weights
+
+
+# Preserve the public training API and keep epoch state together in its coordinator.
 def train(
     dataloaders,
     model,
@@ -45,7 +65,7 @@ def train(
 ):
     """
     Train and validate the model over a given number of epochs.
-    
+
     This function performs the training loop for a video classification model.
     It iterates through the specified number of epochs, updates model weights
     using backpropagation, and evaluates model performance on a validation set.
@@ -56,7 +76,8 @@ def train(
         model (torch.nn.Module): The video classification model to be trained.
         criterion (callable): Training loss function.
         optimizer (torch.optim.Optimizer): Optimizer for updating model weights.
-        scheduler (torch.optim.lr_scheduler): Learning rate scheduler, which adjusts the learning rate based on validation loss.
+        scheduler (torch.optim.lr_scheduler): Scheduler that adjusts the learning
+            rate based on validation loss.
         device (torch.device): Device (CPU or GPU) on which to perform training.
         optim_model_wts_dir (str): Directory to save the best model weights.
         metrics_dir (str, optional): Directory for the metrics CSV. Defaults to the model directory.
@@ -68,11 +89,11 @@ def train(
     Returns:
         tuple: (model, loss_hist, acc_hist)
             - model (torch.nn.Module): The trained model loaded with the best validation weights.
-            - loss_hist (dict): Dictionary containing lists of training and validation losses for each epoch.
-            - acc_hist (dict): Dictionary containing lists of training and validation accuracies for each epoch.
+            - loss_hist (dict): Training and validation losses for each epoch.
+            - acc_hist (dict): Training and validation accuracies for each epoch.
     """
-    loss_hist = {'train': [], 'val': []}
-    acc_hist = {'train': [], 'val': []}
+    loss_hist = {"train": [], "val": []}
+    acc_hist = {"train": [], "val": []}
     if val_criterion is None:
         val_criterion = criterion
 
@@ -81,9 +102,9 @@ def train(
 
     # Initialize training logs and metrics
     metrics_path = os.path.join(metrics_dir or optim_model_wts_dir, "metrics.csv")
-    with open(metrics_path, "x", newline="", encoding="utf-8") as metrics_file:
-        writer = csv.writer(metrics_file)
-        writer.writerow([
+    _write_metrics(
+        metrics_path,
+        [
             "epoch",
             "learning_rate",
             "train_loss",
@@ -91,46 +112,52 @@ def train(
             "val_loss",
             "val_accuracy",
             "cnn_learning_rate",
-        ])
+        ],
+        mode="x",
+    )
     print(f"Saving metrics to: {metrics_path}")
 
     # Begin training loop
     for epoch in range(n_epochs):
         current_lr = get_learning_rate(optimizer)
-        cnn_lr = get_learning_rate(optimizer, 'cnn')
+        cnn_lr = get_learning_rate(optimizer, "cnn")
         print(
-            f'Epoch {epoch + 1}/{n_epochs}; '
-            f'CNN learning rate {cnn_lr}; recurrent head learning rate {current_lr}'
+            f"Epoch {epoch + 1}/{n_epochs}; "
+            f"CNN learning rate {cnn_lr}; recurrent head learning rate {current_lr}"
         )
 
         # Training phase
         model.train()
-        train_loss, train_accuracy = get_epoch_loss(model, criterion, dataloaders['train'], device, optimizer)
-        loss_hist['train'].append(train_loss)
-        acc_hist['train'].append(train_accuracy)
+        train_loss, train_accuracy = get_epoch_loss(
+            model, criterion, dataloaders["train"], device, optimizer
+        )
+        loss_hist["train"].append(train_loss)
+        acc_hist["train"].append(train_accuracy)
 
         # Validation phase
         model.eval()
         with torch.no_grad():
             val_loss, val_accuracy = get_epoch_loss(
-                model, val_criterion, dataloaders['val'], device,
+                model,
+                val_criterion,
+                dataloaders["val"],
+                device,
             )
         if val_accuracy > best_val_acc:
             best_val_acc = val_accuracy
-            best_model_wts = copy.deepcopy(model.state_dict())
-            best_model_name = 'best_model_wts.pt'
-            best_model_path = os.path.join(optim_model_wts_dir, best_model_name)
-            torch.save(best_model_wts, best_model_path)
-            print('Best model weights are updated at epoch {}!'.format(epoch+1))
-            if wandb_run is not None:
-                wandb_run.summary['checkpoint_file'] = 'models/best_model_wts.pt'
-        loss_hist['val'].append(val_loss)
-        acc_hist['val'].append(val_accuracy)
+            best_model_wts = _save_checkpoint(
+                model,
+                optim_model_wts_dir,
+                epoch + 1,
+                wandb_run,
+            )
+        loss_hist["val"].append(val_loss)
+        acc_hist["val"].append(val_accuracy)
 
         # Log metrics to CSV
-        with open(metrics_path, "a", newline="", encoding="utf-8") as metrics_file:
-            writer = csv.writer(metrics_file)
-            writer.writerow([
+        _write_metrics(
+            metrics_path,
+            [
                 epoch + 1,
                 current_lr,
                 train_loss,
@@ -138,11 +165,18 @@ def train(
                 val_loss,
                 val_accuracy,
                 cnn_lr,
-            ])
+            ],
+        )
 
         log_epoch(
-            wandb_run, epoch + 1, current_lr, cnn_lr,
-            train_loss, train_accuracy, val_loss, val_accuracy,
+            wandb_run,
+            epoch + 1,
+            current_lr,
+            cnn_lr,
+            train_loss,
+            train_accuracy,
+            val_loss,
+            val_accuracy,
         )
 
         # Update learning rate based on validation loss
@@ -161,30 +195,32 @@ def train(
     model.load_state_dict(best_model_wts)
     return model, loss_hist, acc_hist
 
-def get_learning_rate(optimizer, group_name='head'):
+
+def get_learning_rate(optimizer, group_name="head"):
     """
     Retrieve a named group's rate, or the first rate for legacy optimizers.
-    
+
     Args:
         optimizer (torch.optim.Optimizer): The optimizer from which to get the learning rate.
         group_name (str): Parameter-group name. Defaults to the recurrent head.
-    
+
     Returns:
         float: The named group's rate, falling back to the first group when absent.
     """
     for param_group in optimizer.param_groups:
-        if param_group.get('name') == group_name:
-            return param_group['lr']
-    return optimizer.param_groups[0]['lr']
+        if param_group.get("name") == group_name:
+            return param_group["lr"]
+    return optimizer.param_groups[0]["lr"]
+
 
 def batch_correct_preds(output, target):
     """
     Compute the number of correct predictions for a mini-batch.
-    
+
     Args:
         output (torch.Tensor): Model outputs (logits) with shape (batch_size, num_classes).
         target (torch.Tensor): True labels with shape (batch_size).
-    
+
     Returns:
         int: Number of correct predictions in the mini-batch.
     """
@@ -192,16 +228,18 @@ def batch_correct_preds(output, target):
     correct_preds = pred.eq(target.view_as(pred)).sum().item()
     return correct_preds
 
+
 def get_batch_loss(criterion, output, target, optimizer=None):
     """
     Compute the loss for a mini-batch and perform backpropagation (if optimizer is provided).
-    
+
     Args:
         criterion (callable): Loss function.
         output (torch.Tensor): Model outputs for the mini-batch.
         target (torch.Tensor): True labels for the mini-batch.
-        optimizer (torch.optim.Optimizer, optional): Optimizer to update model weights. If None, no backpropagation is performed.
-    
+        optimizer (torch.optim.Optimizer, optional): Updates model weights when
+            supplied. If None, no backpropagation is performed.
+
     Returns:
         tuple: (loss_value, n_batch_correct_preds)
             - loss_value (float): Loss value for the mini-batch.
@@ -216,6 +254,7 @@ def get_batch_loss(criterion, output, target, optimizer=None):
         optimizer.step()
     return loss.item(), n_batch_correct_preds
 
+
 def get_epoch_loss(model, criterion, dataloader, device, optimizer=None):
     """
     Compute the average loss and overall accuracy for an epoch.
@@ -228,7 +267,8 @@ def get_epoch_loss(model, criterion, dataloader, device, optimizer=None):
         criterion (callable): Loss function.
         dataloader (torch.utils.data.DataLoader): DataLoader for the dataset.
         device (torch.device): Device (CPU or GPU) on which to perform computations.
-        optimizer (torch.optim.Optimizer, optional): If provided, used to update model weights during training.
+        optimizer (torch.optim.Optimizer, optional): Updates model weights during
+            training when supplied.
 
     Returns:
         tuple: (loss, accuracy)
@@ -246,6 +286,7 @@ def get_epoch_loss(model, criterion, dataloader, device, optimizer=None):
         running_loss += batch_loss
         running_total_correct_preds += n_batch_correct_preds
 
-    loss = running_loss / float(len_dataset)
-    accuracy = running_total_correct_preds / float(len_dataset)
-    return loss, accuracy
+    return (
+        running_loss / float(len_dataset),
+        running_total_correct_preds / float(len_dataset),
+    )

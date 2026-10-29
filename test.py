@@ -16,16 +16,17 @@ import torch
 from tqdm import tqdm
 from sklearn.metrics import classification_report, multilabel_confusion_matrix
 
+
 def test(model, dataloader, device, metrics=None):
     """
     Evaluate the model and optionally collect mean loss and accuracy for logging.
-    
+
     This function sets the model to evaluation mode and processes the test data
     from the provided DataLoader. It computes predictions for each batch, counts the number
     of correct predictions, and accumulates the true and predicted labels.
     Unsmoothed cross-entropy is summed over videos, then divided by the number
     actually evaluated, including when a sampler visits only part of a dataset.
-    
+
     Args:
         model (torch.nn.Module): The trained video classification model.
         dataloader (torch.utils.data.DataLoader): DataLoader containing the test dataset.
@@ -33,7 +34,7 @@ def test(model, dataloader, device, metrics=None):
         metrics (dict, optional): Output mapping updated with ``loss`` (mean
             video cross-entropy), ``accuracy`` (fraction correct), and ``samples``.
             Omitting it preserves the original three-value return interface.
-    
+
     Returns:
         tuple: (targets, outputs, accuracy)
             - targets (list): Ground truth labels for all samples.
@@ -54,59 +55,62 @@ def test(model, dataloader, device, metrics=None):
             x_batch, y_batch = x_batch.to(device), y_batch.to(device)
             output = model(x_batch, lengths)
             total_loss += torch.nn.functional.cross_entropy(
-                output, y_batch, reduction='sum',
+                output,
+                y_batch,
+                reduction="sum",
             ).item()
             pred = output.argmax(dim=1, keepdim=True)
-            correct_preds = pred.eq(y_batch.view_as(pred)).sum().item()
-            total_correct_preds += correct_preds
+            total_correct_preds += pred.eq(y_batch.view_as(pred)).sum().item()
             num_seen += y_batch.numel()
             outputs.extend(pred.view(-1).detach().cpu().tolist())
             targets.extend(y_batch.detach().cpu().tolist())
-        
+
         if num_seen == 0:
-            raise ValueError('The test loader must contain at least one video')
+            raise ValueError("The test loader must contain at least one video")
         accuracy = total_correct_preds / float(num_seen)
         if metrics is not None:
             metrics.update(loss=total_loss / num_seen, accuracy=accuracy, samples=num_seen)
-    
+
     return targets, outputs, accuracy
+
 
 def get_test_report(target, output, target_names):
     """
     Generate a detailed classification report based on test results.
-    
+
     This function uses scikit-learn's classification_report to produce a dictionary
     containing precision, recall, F1-score, and support for each class.
-    
+
     Args:
         target (list): Ground truth labels.
         output (list): Predicted labels.
         target_names (list): List of class names corresponding to the labels.
-    
+
     Returns:
         dict: A classification report as a dictionary.
     """
     return classification_report(target, output, output_dict=True, target_names=target_names)
 
+
 def get_confusion_matrix(targets, outputs, labels_dict, all_cats):
     """
     Compute a multilabel confusion matrix for each class.
-    
+
     This function converts numeric labels to their corresponding class names using the provided
     labels_dict, then computes a multilabel confusion matrix for each class using scikit-learn.
-    
+
     Args:
         targets (list): Ground truth numeric labels.
         outputs (list): Predicted numeric labels.
         labels_dict (dict): Dictionary mapping class names to numeric labels.
         all_cats (list): List of all class names.
-    
+
     Returns:
-        dict: A dictionary where keys are class names and values are the corresponding confusion matrices.
+        dict: Class names mapped to their corresponding confusion matrices.
     """
     # Create an inverse mapping from numeric label to class name
     inv_labels_dict = {label: cat for cat, label in labels_dict.items()}
     target_cats = [inv_labels_dict[target] for target in targets]
     output_cats = [inv_labels_dict[output] for output in outputs]
     confusion_mat = multilabel_confusion_matrix(target_cats, output_cats, labels=all_cats)
-    return {label: mat for label, mat in zip(all_cats, confusion_mat)}
+    return dict(zip(all_cats, confusion_mat))

@@ -138,7 +138,7 @@ def start_tracking(args, run_dir=None, config=None, job_type='train'):
     return run
 
 
-def log_epoch(  # pylint: disable=too-many-arguments,too-many-positional-arguments
+def log_epoch(
     run, epoch, learning_rate, cnn_learning_rate, train_loss, train_accuracy,
     val_loss, val_accuracy,
 ):
