@@ -34,7 +34,8 @@ Arguments include:
     --temporal_attention: Learn temporal pooling weights instead of a mean (default: off).
     -bs/--batch_size: Mini-batch size (required).
     -d/--dropout: Dropout rate for regularization (default: 0.1).
-    -lr/--learning_rate: Learning rate for training (default: 3e-5).
+    -lr/--learning_rate: Learning rate for the recurrent head (default: 3e-5).
+    --cnn_learning_rate: CNN learning rate (defaults to --learning_rate).
     --weight_decay: AdamW weight decay; zero disables decay (default: 0.0).
     --label_smoothing: Training target smoothing in [0, 1] (default: 0.0).
     -ne/--n_epochs: Number of training epochs (default: 30).
@@ -79,7 +80,8 @@ def args_parser():
         --rnn_layer_norm: Normalize recurrent outputs before temporal pooling (default: off).
         --temporal_attention: Learn temporal pooling weights instead of a mean (default: off).
         -d/--dropout: Dropout rate (default: 0.1).
-        -lr/--learning_rate: Learning rate for training (default: 3e-5).
+        -lr/--learning_rate: Learning rate for the recurrent head (default: 3e-5).
+        --cnn_learning_rate: CNN learning rate (defaults to --learning_rate).
         --weight_decay: AdamW weight decay; zero disables decay (default: 0.0).
         --label_smoothing: Training target smoothing in [0, 1] (default: 0.0).
         -ne/--n_epochs: Number of training epochs (default: 30).
@@ -104,12 +106,17 @@ def args_parser():
 
     parser.add_argument('-bs', '--batch_size', type=int, help='Mini-batch size', required=True)
     parser.add_argument('-d', '--dropout', type=float, default=0.1, help='Dropout rate for regularization')
-    parser.add_argument('-lr', '--learning_rate', type=float, default=3e-5, help='Learning rate for the model training')
+    parser.add_argument('-lr', '--learning_rate', type=float, default=3e-5, help='Learning rate for the recurrent head (default: 3e-5)')
+    parser.add_argument('--cnn_learning_rate', type=float, default=None, help='CNN learning rate; defaults to --learning_rate when omitted')
     parser.add_argument('--weight_decay', type=float, default=0.0, help='AdamW weight decay; use 0 to disable (default: 0.0)')
     parser.add_argument('--label_smoothing', type=float, default=0.0, help='Training label smoothing in [0, 1]; use 0 to disable (default: 0.0)')
     parser.add_argument('-ne', '--n_epochs', type=int, default=30, help='Number of training epochs')
 
     args = parser.parse_args()
+    for option in ('learning_rate', 'cnn_learning_rate'):
+        value = getattr(args, option)
+        if value is not None and not 0.0 < value < float('inf'):
+            parser.error(f'--{option} must be finite and positive')
     if not 0.0 <= args.weight_decay < float('inf'):
         parser.error('--weight_decay must be finite and nonnegative')
     if not 0.0 <= args.label_smoothing <= 1.0:
@@ -155,6 +162,7 @@ def trainer(args):
     batch_size = args.batch_size
     n_epochs = args.n_epochs
     learning_rate = args.learning_rate
+    cnn_learning_rate = (learning_rate if args.cnn_learning_rate is None else args.cnn_learning_rate)
     weight_decay = args.weight_decay
     label_smoothing = args.label_smoothing
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu')
@@ -192,8 +200,20 @@ def trainer(args):
     # Define the loss function, optimizer, and learning rate scheduler
     loss_func = nn.CrossEntropyLoss(reduction='sum', label_smoothing=label_smoothing)
     val_loss_func = nn.CrossEntropyLoss(reduction='sum')
-    opt = optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
+    # Keep the pretrained CNN and recurrent head in separate learning-rate groups.
+    opt = optim.AdamW([
+        {'name': 'cnn', 'params': model.base_model.parameters(), 'lr': cnn_learning_rate},
+        {
+            'name': 'head',
+            'params': [
+                parameter for name, parameter in model.named_parameters()
+                if not name.startswith('base_model.')
+            ],
+            'lr': learning_rate,
+        },
+    ], lr=learning_rate, weight_decay=weight_decay)
     print(f"Optimizer: AdamW; weight decay: {weight_decay}")
+    print(f"CNN learning rate: {cnn_learning_rate}; recurrent head rate: {learning_rate}")
     print(f"Training label smoothing: {label_smoothing}")
     lr_scheduler = ReduceLROnPlateau(opt, mode='min', factor=0.5, patience=5, verbose=1)
     

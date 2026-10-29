@@ -8,7 +8,7 @@ functions to compute the learning rate, batch loss, and epoch loss.
 
 Functions:
     - train: Runs the training and validation loops over a specified number of epochs.
-    - get_learning_rate: Retrieves the current learning rate from an optimizer.
+    - get_learning_rate: Retrieves the current learning rate for an optimizer group.
     - batch_correct_preds: Computes the number of correct predictions in a mini-batch.
     - get_batch_loss: Computes the loss for a mini-batch and performs backpropagation.
     - get_epoch_loss: Computes the average loss and accuracy over an epoch.
@@ -87,13 +87,18 @@ def train(
             "train_accuracy",
             "val_loss",
             "val_accuracy",
+            "cnn_learning_rate",
         ])
     print(f"Saving metrics to: {metrics_path}")
 
     # Begin training loop
     for epoch in range(n_epochs):
         current_lr = get_learning_rate(optimizer)
-        print('Epoch {}/{}; Current learning rate {}'.format(epoch+1, n_epochs, current_lr))
+        cnn_lr = get_learning_rate(optimizer, 'cnn')
+        print(
+            f'Epoch {epoch + 1}/{n_epochs}; '
+            f'CNN learning rate {cnn_lr}; recurrent head learning rate {current_lr}'
+        )
 
         # Training phase
         model.train()
@@ -127,6 +132,7 @@ def train(
                 train_accuracy,
                 val_loss,
                 val_accuracy,
+                cnn_lr,
             ])
 
         # Update learning rate based on validation loss
@@ -145,18 +151,21 @@ def train(
     model.load_state_dict(best_model_wts)
     return model, loss_hist, acc_hist
 
-def get_learning_rate(optimizer):
+def get_learning_rate(optimizer, group_name='head'):
     """
-    Retrieve the current learning rate from the optimizer.
+    Retrieve a named group's rate, or the first rate for legacy optimizers.
     
     Args:
         optimizer (torch.optim.Optimizer): The optimizer from which to get the learning rate.
+        group_name (str): Parameter-group name. Defaults to the recurrent head.
     
     Returns:
-        float: The current learning rate.
+        float: The named group's rate, falling back to the first group when absent.
     """
     for param_group in optimizer.param_groups:
-        return param_group['lr']
+        if param_group.get('name') == group_name:
+            return param_group['lr']
+    return optimizer.param_groups[0]['lr']
 
 def batch_correct_preds(output, target):
     """

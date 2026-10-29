@@ -17,6 +17,8 @@ python run.py \
     --n_epochs 100 \
     --num_workers 4 \
     --dropout 0.3 \
+    --learning_rate 3e-5 \
+    --cnn_learning_rate 3e-6 \
     --weight_decay 0.0 \
     --label_smoothing 0.0 \
     --random_temporal_sampling
