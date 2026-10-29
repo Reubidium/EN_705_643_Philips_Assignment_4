@@ -61,6 +61,7 @@ def args_parser():
         -rnl/--rnn_n_layers: Number of RNN/LSTM layers (default 1).
         --bidirectional: Enable whole-sequence BiLSTM processing (default off).
         --rnn_layer_norm: Normalize recurrent outputs before temporal pooling (default off).
+        --temporal_attention: Learn temporal pooling weights instead of a mean (default off).
         -m/--mode: Mode of operation: 'train' or 'eval' (required).
         -bs/--batch_size: Mini-batch size (required).
         -d/--dropout: Dropout rate for regularization (default 0.1).
@@ -86,6 +87,7 @@ def args_parser():
     parser.add_argument('-rnl', '--rnn_n_layers', type=int, default=1, help='Number of RNN/LSTM layers')
     parser.add_argument('--bidirectional', action='store_true', help='Use a whole-sequence bidirectional LSTM (default: off)')
     parser.add_argument('--rnn_layer_norm', action='store_true', help='Apply LayerNorm to recurrent outputs before temporal pooling (default: off)')
+    parser.add_argument('--temporal_attention', action='store_true', help='Use learned, padding-aware temporal attention pooling (default: off)')
     parser.add_argument('--fine_tune_last_block', action='store_true', default=False, help='Freeze early CNN stages; train the final stage, LSTM, and classifier')
 
     parser.add_argument('-m', '--mode', type=str, default='train', help="Either 'train' or 'eval'", required=True)
@@ -139,6 +141,7 @@ def main(args):
     rnn_n_layers = args.rnn_n_layers
     bidirectional = args.bidirectional
     rnn_layer_norm = args.rnn_layer_norm
+    temporal_attention = args.temporal_attention
     dropout = args.dropout
     pretrained = args.pretrained
     cnn_backbone = args.cnn_backbone
@@ -167,6 +170,7 @@ def main(args):
         n_classes=n_classes, pretrained=pretrained, cnn_model=cnn_backbone,
         fine_tune_last_block=fine_tune_last_block, bidirectional=bidirectional,
         rnn_layer_norm=rnn_layer_norm,
+        temporal_attention=temporal_attention,
     )
 
     if mode == 'train':
@@ -188,6 +192,7 @@ def main(args):
             f"  RNN layers:                 {rnn_n_layers}\n"
             f"  Bidirectional LSTM:         {bidirectional}\n"
             f"  RNN output LayerNorm:       {rnn_layer_norm}\n"
+            f"  Temporal attention:         {temporal_attention}\n"
             f"  Dropout:                    {dropout}\n"
             f"  Pretrained backbone:        {pretrained}\n"
             f"  CNN backbone:               {cnn_backbone}\n"
@@ -263,6 +268,7 @@ def main(args):
             f"  RNN layers:                 {rnn_n_layers}\n"
             f"  Bidirectional LSTM:         {bidirectional}\n"
             f"  RNN output LayerNorm:       {rnn_layer_norm}\n"
+            f"  Temporal attention:         {temporal_attention}\n"
             f"  Number of classes:          {n_classes}\n"
             f"  Frames per video:           {fr_per_vid}\n"
             f"  Batch size:                 {batch_size}\n"

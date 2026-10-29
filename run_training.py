@@ -31,6 +31,7 @@ Arguments include:
     -rnl/--rnn_n_layers: Number of RNN/LSTM layers (default: 1).
     --bidirectional: Enable whole-sequence BiLSTM processing (default: off).
     --rnn_layer_norm: Normalize recurrent outputs before temporal pooling (default: off).
+    --temporal_attention: Learn temporal pooling weights instead of a mean (default: off).
     -bs/--batch_size: Mini-batch size (required).
     -d/--dropout: Dropout rate for regularization (default: 0.1).
     -lr/--learning_rate: Learning rate for training (default: 3e-5).
@@ -76,6 +77,7 @@ def args_parser():
         -rnl/--rnn_n_layers: Number of RNN/LSTM layers (default: 1).
         --bidirectional: Enable whole-sequence BiLSTM processing (default: off).
         --rnn_layer_norm: Normalize recurrent outputs before temporal pooling (default: off).
+        --temporal_attention: Learn temporal pooling weights instead of a mean (default: off).
         -d/--dropout: Dropout rate (default: 0.1).
         -lr/--learning_rate: Learning rate for training (default: 3e-5).
         --weight_decay: AdamW weight decay; zero disables decay (default: 0.0).
@@ -98,6 +100,7 @@ def args_parser():
     parser.add_argument('-rnl', '--rnn_n_layers', type=int, default=1, help='Number of RNN/LSTM layers')
     parser.add_argument('--bidirectional', action='store_true', help='Use a whole-sequence bidirectional LSTM (default: off)')
     parser.add_argument('--rnn_layer_norm', action='store_true', help='Apply LayerNorm to recurrent outputs before temporal pooling (default: off)')
+    parser.add_argument('--temporal_attention', action='store_true', help='Use learned, padding-aware temporal attention pooling (default: off)')
 
     parser.add_argument('-bs', '--batch_size', type=int, help='Mini-batch size', required=True)
     parser.add_argument('-d', '--dropout', type=float, default=0.1, help='Dropout rate for regularization')
@@ -143,6 +146,7 @@ def trainer(args):
     rnn_n_layers = args.rnn_n_layers
     bidirectional = args.bidirectional
     rnn_layer_norm = args.rnn_layer_norm
+    temporal_attention = args.temporal_attention
     dropout = args.dropout
     pretrained = args.pretrained
     cnn_backbone = args.cnn_backbone
@@ -179,8 +183,10 @@ def trainer(args):
         n_classes=n_classes, pretrained=pretrained, cnn_model=cnn_backbone,
         bidirectional=bidirectional,
         rnn_layer_norm=rnn_layer_norm,
+        temporal_attention=temporal_attention,
     )
     print(f"RNN output LayerNorm: {rnn_layer_norm}")
+    print(f"Temporal attention: {temporal_attention}")
     model = model.to(device)
 
     # Define the loss function, optimizer, and learning rate scheduler

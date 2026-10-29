@@ -51,6 +51,7 @@ class LRCN(nn.Module):
     This model uses a ResNet or ConvNeXt backbone to extract features from each video frame.
     An LSTM network is then used to model the temporal dynamics across the sequence of frame features.
     Optional LayerNorm normalizes each recurrent timestep before temporal pooling.
+    Optional temporal attention learns weights over genuine recurrent timesteps.
     Dropout is applied before the final fully-connected layer that produces class logits.
 
     Args:
@@ -65,6 +66,8 @@ class LRCN(nn.Module):
             directions. Default False preserves the unidirectional architecture.
         rnn_layer_norm (bool): Normalize the recurrent feature vector at each
             timestep before pooling. Default False preserves older checkpoints.
+        temporal_attention (bool): Use learned temporal pooling instead of the
+            genuine-frame mean. Default False preserves older checkpoints.
     
     Raises:
         ValueError: If the specified cnn_model is not supported.
@@ -72,7 +75,7 @@ class LRCN(nn.Module):
     def __init__(
         self, hidden_size, n_layers, dropout_rate, n_classes, pretrained=True,
         cnn_model='resnet34', fine_tune_last_block=False, bidirectional=False,
-        rnn_layer_norm=False,
+        rnn_layer_norm=False, temporal_attention=False,
     ):
         super(LRCN, self).__init__()
 
@@ -130,6 +133,13 @@ class LRCN(nn.Module):
         self.dropout = nn.Dropout(dropout_rate)
         self.fc = nn.Linear(recurrent_features, n_classes)
 
+        # Create the scorer last to preserve initialization of existing layers.
+        self.attention = nn.Sequential(
+            nn.Linear(recurrent_features, 64),
+            nn.Tanh(),
+            nn.Linear(64, 1),
+        ) if temporal_attention else None
+
     def forward(self, x, lengths):
         """
         Forward pass for the LRCN model.
@@ -141,7 +151,8 @@ class LRCN(nn.Module):
         collected in chronological order and passed through the LSTM in one
         complete, packed sequence. Packing excludes padding from both recurrent
         directions. Optional LayerNorm acts on each timestep's feature vector.
-        Only genuine normalized outputs contribute to the temporal mean.
+        Only genuine normalized outputs contribute to mean or attention pooling.
+        Attention weights are normalized over time independently for each video.
 
         Args:
             x (Tensor): Input tensor of shape (batch_size, time_steps, channels, height, width).
@@ -187,7 +198,14 @@ class LRCN(nn.Module):
         valid = positions[None, :] < lengths_device[:, None]
         # Mask after normalization so its learned bias cannot reintroduce padding.
         out = out.masked_fill(~valid.unsqueeze(-1), 0)
-        out = out.sum(dim=1) / lengths_device[:, None]
+        if self.attention is None:
+            out = out.sum(dim=1) / lengths_device[:, None]
+        else:
+            scores = self.attention(out).squeeze(-1)
+            # Exclude padding before softmax so it receives exactly zero weight.
+            scores = scores.masked_fill(~valid, float('-inf'))
+            weights = torch.softmax(scores, dim=1)
+            out = (out * weights.unsqueeze(-1)).sum(dim=1)
         
         # Apply dropout to the summary
         out = self.dropout(out)

@@ -9,6 +9,7 @@ python run.py \
     --rnn_n_layers 1 \
     --bidirectional \
     --rnn_layer_norm \
+    --temporal_attention \
     --n_classes 50 \
     --fr_per_vid 16 \
     --batch_size 6 \
@@ -17,5 +18,5 @@ python run.py \
     --num_workers 4 \
     --dropout 0.3 \
     --weight_decay 0.0 \
-    --label_smoothing 0.01 \
+    --label_smoothing 0.0 \
     --random_temporal_sampling
