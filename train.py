@@ -39,6 +39,7 @@ def train(
     optim_model_wts_dir,
     n_epochs=30,
     metrics_dir=None,
+    val_criterion=None,
 ):
     """
     Train and validate the model over a given number of epochs.
@@ -51,13 +52,15 @@ def train(
     Args:
         dataloaders (dict): Dictionary containing 'train' and 'val' DataLoaders.
         model (torch.nn.Module): The video classification model to be trained.
-        criterion (callable): Loss function.
+        criterion (callable): Training loss function.
         optimizer (torch.optim.Optimizer): Optimizer for updating model weights.
         scheduler (torch.optim.lr_scheduler): Learning rate scheduler, which adjusts the learning rate based on validation loss.
         device (torch.device): Device (CPU or GPU) on which to perform training.
         optim_model_wts_dir (str): Directory to save the best model weights.
         metrics_dir (str, optional): Directory for the metrics CSV. Defaults to the model directory.
         n_epochs (int, optional): Number of training epochs. Default is 30.
+        val_criterion (callable, optional): Validation loss function. Defaults to
+            the training criterion, preserving existing calls.
 
     Returns:
         tuple: (model, loss_hist, acc_hist)
@@ -67,6 +70,8 @@ def train(
     """
     loss_hist = {'train': [], 'val': []}
     acc_hist = {'train': [], 'val': []}
+    if val_criterion is None:
+        val_criterion = criterion
 
     best_model_wts = copy.deepcopy(model.state_dict())
     best_val_acc = 0.0
@@ -99,7 +104,9 @@ def train(
         # Validation phase
         model.eval()
         with torch.no_grad():
-            val_loss, val_accuracy = get_epoch_loss(model, criterion, dataloaders['val'], device)
+            val_loss, val_accuracy = get_epoch_loss(
+                model, val_criterion, dataloaders['val'], device,
+            )
         if val_accuracy > best_val_acc:
             best_val_acc = val_accuracy
             best_model_wts = copy.deepcopy(model.state_dict())

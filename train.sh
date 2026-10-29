@@ -17,4 +17,5 @@ python run.py \
     --num_workers 4 \
     --dropout 0.3 \
     --weight_decay 0.0 \
+    --label_smoothing 0.01 \
     --random_temporal_sampling
