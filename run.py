@@ -25,6 +25,7 @@ The module also includes a helper function for parsing command-line arguments.
 
 import os
 import argparse
+import json
 
 import torch
 import torch.nn as nn
@@ -38,8 +39,9 @@ from utils import transform_stats, compose_data_transforms, train_val_dloaders, 
 from models import LRCN
 from train import create_run_directory, train
 from test import test, get_test_report, get_confusion_matrix
+from tracking import start_tracking, finish_tracking
 
-def args_parser():
+def args_parser(argv=None):
     """
     Parse command-line arguments for configuring the video classification training or evaluation.
 
@@ -67,6 +69,12 @@ def args_parser():
         -d/--dropout: Dropout rate for regularization (default 0.1).
         -lr/--learning_rate: Learning rate for the recurrent head (default 3e-5).
         --cnn_learning_rate: CNN learning rate (defaults to --learning_rate).
+        --wandb: Enable optional Weights & Biases logging.
+        --wandb_project: Destination project (default assignment-4-ucf50).
+        --wandb_entity: Destination team/entity, or the SDK's configured default.
+        --wandb_mode: online, offline, or disabled (default online).
+        --wandb_name: Optional display name for the W&B run.
+        --wandb_run_id: Existing W&B run ID to resume for evaluation only.
         --weight_decay: AdamW weight decay; zero disables decay (default 0.0).
         --label_smoothing: Training target smoothing in [0, 1] (default 0.0).
         -ne/--n_epochs: Number of training epochs (default 30).
@@ -100,8 +108,14 @@ def args_parser():
     parser.add_argument('--label_smoothing', type=float, default=0.0, help='Training label smoothing in [0, 1]; use 0 to disable (default: 0.0)')
     parser.add_argument('-ne', '--n_epochs', type=int, default=30, help='Number of training epochs')
     parser.add_argument('--num_workers', type=int, default=0, help='Number of workers for data loading (default: 0)')
+    parser.add_argument('--wandb', action='store_true', help='Log metrics and configuration to Weights & Biases')
+    parser.add_argument('--wandb_project', default='assignment-4-ucf50', help='W&B project name')
+    parser.add_argument('--wandb_entity', default=None, help='W&B team/entity; otherwise use the configured SDK default')
+    parser.add_argument('--wandb_mode', choices=('online', 'offline', 'disabled'), default='online', help='W&B logging mode')
+    parser.add_argument('--wandb_name', default=None, help='Optional W&B run display name')
+    parser.add_argument('--wandb_run_id', default=None, help='Existing W&B run ID to resume when evaluating its checkpoint')
 
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     for option in ('learning_rate', 'cnn_learning_rate'):
         value = getattr(args, option)
         if value is not None and not 0.0 < value < float('inf'):
@@ -110,7 +124,42 @@ def args_parser():
         parser.error('--weight_decay must be finite and nonnegative')
     if not 0.0 <= args.label_smoothing <= 1.0:
         parser.error('--label_smoothing must be finite and between 0 and 1')
+    if args.wandb_run_id and (not args.wandb or args.mode != 'eval'
+                              or args.wandb_mode != 'online'):
+        parser.error('--wandb_run_id requires --wandb, --mode eval, and online mode')
     return args
+
+
+def _evaluation_tracking_args(args, run_dir):
+    """Reuse the checkpoint's recorded online run unless an ID is explicitly given.
+
+    Only pointers in the requested project/team are eligible. Old checkpoints
+    without tracking metadata get a separate evaluation run. An explicit
+    ``--wandb_run_id`` can attach evaluation to an imported historical run.
+    """
+    if (not args.wandb or args.wandb_mode != 'online' or args.wandb_run_id):
+        return args
+    metadata_path = os.path.join(run_dir, 'tracking.json')
+    if not os.path.isfile(metadata_path):
+        return args
+    with open(metadata_path, encoding='utf-8') as source:
+        metadata = json.load(source)
+    if not isinstance(metadata, dict):
+        raise ValueError('tracking.json must contain a W&B run metadata object')
+    if metadata.get('mode') != 'online' or metadata.get('job_type') not in ('train', 'import'):
+        return args
+    if (metadata.get('project') != args.wandb_project
+            or (args.wandb_entity and metadata.get('entity') != args.wandb_entity)):
+        raise ValueError(
+            'The checkpoint W&B destination differs from --wandb_project/--wandb_entity. '
+            'Use the original destination or an explicit --wandb_run_id.'
+        )
+    if not metadata.get('run_id'):
+        raise ValueError('tracking.json is missing its W&B run_id')
+    values = vars(args).copy()
+    values.update(wandb_run_id=metadata['run_id'], wandb_entity=metadata.get('entity'))
+    print(f"Appending test metrics to W&B run: {metadata['run_id']}")
+    return argparse.Namespace(**values)
 
 def main(args):
     """
@@ -263,19 +312,28 @@ def main(args):
         ], lr=learning_rate, weight_decay=weight_decay)
         lr_scheduler = ReduceLROnPlateau(opt, mode='min', factor=0.5, patience=5)
 
-        # Main training procedure
-        model, loss_hist, acc_hist = train(
-            dataloaders,
-            model,
-            loss_func,
-            opt,
-            lr_scheduler,
-            device,
-            optim_model_dir,
-            n_epochs,
-            metrics_dir=run_dir,
-            val_criterion=val_loss_func,
-        )
+        # Preserve the exact configuration for later CSV imports and reproduction.
+        configuration = {
+            **vars(args), 'training_method': 'joint', 'device_type': device.type,
+            'training_videos': len(tr_split), 'validation_videos': len(val_split),
+            'test_videos': len(ts_split), 'label_mapping': label_dict,
+            'effective_cnn_learning_rate': cnn_learning_rate, 'split_seed': 0,
+        }
+        with open(os.path.join(run_dir, 'training_config.json'), 'w', encoding='utf-8') as output:
+            json.dump(configuration, output, indent=2)
+        wandb_run = start_tracking(args, run_dir, configuration, job_type='train')
+        exit_code = 0
+        try:
+            model, loss_hist, acc_hist = train(
+                dataloaders, model, loss_func, opt, lr_scheduler, device,
+                optim_model_dir, n_epochs, metrics_dir=run_dir,
+                val_criterion=val_loss_func, wandb_run=wandb_run,
+            )
+        except BaseException:
+            exit_code = 1
+            raise
+        finally:
+            finish_tracking(wandb_run, exit_code=exit_code)
 
     elif mode == 'eval':
         print(
@@ -308,10 +366,43 @@ def main(args):
         dataloaders = test_dloaders(ts_dataset, batch_size, num_workers, model_type)
 
         # Load the trained model checkpoint
-        model.load_state_dict(torch.load(args.ckpt))
+        model.load_state_dict(torch.load(args.ckpt, map_location=device))
         model.to(device)
-        targets, outputs, accuracy = test(model, dataloaders['test'], device)
-
+        tracking_args = _evaluation_tracking_args(args, run_dir)
+        wandb_run = start_tracking(
+            tracking_args, run_dir, {'evaluation_checkpoint': os.path.abspath(ckpt),
+                            'test_videos': len(ts_split), 'device_type': device.type},
+            job_type='eval',
+        )
+        exit_code = 0
+        try:
+            evaluation_metrics = {}
+            targets, outputs, accuracy = test(
+                model, dataloaders['test'], device, evaluation_metrics,
+            )
+            if evaluation_metrics:
+                result = {
+                    **evaluation_metrics, 'checkpoint': os.path.abspath(ckpt),
+                    'splits_file': os.path.abspath(splits_path),
+                    'evaluation_config': vars(args),
+                }
+                stem = os.path.splitext(os.path.basename(ckpt))[0]
+                metrics_path = os.path.join(run_dir, f'test_metrics_{stem}.json')
+                with open(metrics_path, 'w', encoding='utf-8') as output:
+                    json.dump(result, output, indent=2)
+                print(f"Mean test loss: {evaluation_metrics['loss']:.6f}")
+                print(f'Saved test metrics to: {metrics_path}')
+                if wandb_run is not None:
+                    logged = {f'test/{name}': value for name, value in evaluation_metrics.items()}
+                    wandb_run.log(logged)
+                    for name, value in logged.items():
+                        wandb_run.summary[name] = value
+                    wandb_run.summary['test_checkpoint'] = os.path.abspath(ckpt)
+        except BaseException:
+            exit_code = 1
+            raise
+        finally:
+            finish_tracking(wandb_run, exit_code=exit_code)
         print('The overall test accuracy is {:.4f}%.'.format(100 * accuracy))
 
     else:

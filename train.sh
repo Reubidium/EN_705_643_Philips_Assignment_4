@@ -21,4 +21,7 @@ python run.py \
     --cnn_learning_rate 3e-6 \
     --weight_decay 0.0 \
     --label_smoothing 0.0 \
-    --random_temporal_sampling
+    --random_temporal_sampling \
+    --wandb \
+    --wandb_entity rphilip4-johns-hopkins-university \
+    --wandb_project Philips_Assignment_4_Video_Action_Recognition

@@ -1,4 +1,3 @@
-#!/bin/bash
 python run.py \
     --ckpt ./runs/YOUR_ATTENTION_RUN/models/best_model_wts.pt \
     --cnn_backbone convnext_tiny \
@@ -10,4 +9,7 @@ python run.py \
     --n_classes 50 \
     --fr_per_vid 16 \
     --batch_size 16 \
-    --mode eval
+    --mode eval \
+    --wandb \
+    --wandb_entity rphilip4-johns-hopkins-university \
+    --wandb_project Philips_Assignment_4_Video_Action_Recognition

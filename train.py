@@ -20,6 +20,7 @@ from tqdm import tqdm
 import torch
 import csv
 from datetime import datetime
+from tracking import log_epoch
 
 def create_run_directory(runs_dir='./runs'):
     """Create a timestamped run directory with a nested models directory."""
@@ -40,6 +41,7 @@ def train(
     n_epochs=30,
     metrics_dir=None,
     val_criterion=None,
+    wandb_run=None,
 ):
     """
     Train and validate the model over a given number of epochs.
@@ -61,6 +63,7 @@ def train(
         n_epochs (int, optional): Number of training epochs. Default is 30.
         val_criterion (callable, optional): Validation loss function. Defaults to
             the training criterion, preserving existing calls.
+        wandb_run (optional): Active W&B run, or None to retain local-only logging.
 
     Returns:
         tuple: (model, loss_hist, acc_hist)
@@ -119,6 +122,8 @@ def train(
             best_model_path = os.path.join(optim_model_wts_dir, best_model_name)
             torch.save(best_model_wts, best_model_path)
             print('Best model weights are updated at epoch {}!'.format(epoch+1))
+            if wandb_run is not None:
+                wandb_run.summary['checkpoint_file'] = 'models/best_model_wts.pt'
         loss_hist['val'].append(val_loss)
         acc_hist['val'].append(val_accuracy)
 
@@ -134,6 +139,11 @@ def train(
                 val_accuracy,
                 cnn_lr,
             ])
+
+        log_epoch(
+            wandb_run, epoch + 1, current_lr, cnn_lr,
+            train_loss, train_accuracy, val_loss, val_accuracy,
+        )
 
         # Update learning rate based on validation loss
         scheduler.step(val_loss)
