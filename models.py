@@ -50,6 +50,7 @@ class LRCN(nn.Module):
     
     This model uses a ResNet or ConvNeXt backbone to extract features from each video frame.
     An LSTM network is then used to model the temporal dynamics across the sequence of frame features.
+    Optional LayerNorm normalizes each recurrent timestep before temporal pooling.
     Dropout is applied before the final fully-connected layer that produces class logits.
 
     Args:
@@ -62,6 +63,8 @@ class LRCN(nn.Module):
         fine_tune_last_block (bool): Train only the final CNN stage and, for ConvNeXt, its final feature normalization. The LSTM and video classifier stay trainable.
         bidirectional (bool): Process the complete frame-feature sequence in both
             directions. Default False preserves the unidirectional architecture.
+        rnn_layer_norm (bool): Normalize the recurrent feature vector at each
+            timestep before pooling. Default False preserves older checkpoints.
     
     Raises:
         ValueError: If the specified cnn_model is not supported.
@@ -69,6 +72,7 @@ class LRCN(nn.Module):
     def __init__(
         self, hidden_size, n_layers, dropout_rate, n_classes, pretrained=True,
         cnn_model='resnet34', fine_tune_last_block=False, bidirectional=False,
+        rnn_layer_norm=False,
     ):
         super(LRCN, self).__init__()
 
@@ -117,12 +121,14 @@ class LRCN(nn.Module):
             bidirectional=bidirectional,
         )
         
-        # Define dropout for regularization.
-        self.dropout = nn.Dropout(dropout_rate)
-        
-        # Final fully-connected layer to produce logits for each class.
         num_directions = 2 if bidirectional else 1
-        self.fc = nn.Linear(hidden_size * num_directions, n_classes)
+        recurrent_features = hidden_size * num_directions
+        # Normalize features within each timestep, independently of batch size.
+        self.rnn_norm = nn.LayerNorm(recurrent_features) if rnn_layer_norm else nn.Identity()
+
+        # Define dropout for regularization and the final class-logit layer.
+        self.dropout = nn.Dropout(dropout_rate)
+        self.fc = nn.Linear(recurrent_features, n_classes)
 
     def forward(self, x, lengths):
         """
@@ -134,7 +140,8 @@ class LRCN(nn.Module):
         At each time step, only genuine frames enter the CNN. Their features are
         collected in chronological order and passed through the LSTM in one
         complete, packed sequence. Packing excludes padding from both recurrent
-        directions. Only genuine outputs contribute to the temporal mean.
+        directions. Optional LayerNorm acts on each timestep's feature vector.
+        Only genuine normalized outputs contribute to the temporal mean.
 
         Args:
             x (Tensor): Input tensor of shape (batch_size, time_steps, channels, height, width).
@@ -172,11 +179,13 @@ class LRCN(nn.Module):
         )
         packed_outputs, _state = self.rnn(packed_features)
         out, _lengths = pad_packed_sequence(packed_outputs, batch_first=True)
+        out = self.rnn_norm(out)
 
         # Unpacking restores the original batch order, including unsorted lengths.
         positions = torch.arange(out.size(1), device=out.device)
         # True for real frames, False for padding.
         valid = positions[None, :] < lengths_device[:, None]
+        # Mask after normalization so its learned bias cannot reintroduce padding.
         out = out.masked_fill(~valid.unsqueeze(-1), 0)
         out = out.sum(dim=1) / lengths_device[:, None]
         

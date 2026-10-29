@@ -60,6 +60,7 @@ def args_parser():
         -rhs/--rnn_hidden_size: LSTM hidden features per direction (default 100).
         -rnl/--rnn_n_layers: Number of RNN/LSTM layers (default 1).
         --bidirectional: Enable whole-sequence BiLSTM processing (default off).
+        --rnn_layer_norm: Normalize recurrent outputs before temporal pooling (default off).
         -m/--mode: Mode of operation: 'train' or 'eval' (required).
         -bs/--batch_size: Mini-batch size (required).
         -d/--dropout: Dropout rate for regularization (default 0.1).
@@ -83,6 +84,7 @@ def args_parser():
     parser.add_argument('-rhs', '--rnn_hidden_size', type=int, default=100, help='Number of LSTM hidden features per direction')
     parser.add_argument('-rnl', '--rnn_n_layers', type=int, default=1, help='Number of RNN/LSTM layers')
     parser.add_argument('--bidirectional', action='store_true', help='Use a whole-sequence bidirectional LSTM (default: off)')
+    parser.add_argument('--rnn_layer_norm', action='store_true', help='Apply LayerNorm to recurrent outputs before temporal pooling (default: off)')
     parser.add_argument('--fine_tune_last_block', action='store_true', default=False, help='Freeze early CNN stages; train the final stage, LSTM, and classifier')
 
     parser.add_argument('-m', '--mode', type=str, default='train', help="Either 'train' or 'eval'", required=True)
@@ -132,6 +134,7 @@ def main(args):
     rnn_hidden_size = args.rnn_hidden_size
     rnn_n_layers = args.rnn_n_layers
     bidirectional = args.bidirectional
+    rnn_layer_norm = args.rnn_layer_norm
     dropout = args.dropout
     pretrained = args.pretrained
     cnn_backbone = args.cnn_backbone
@@ -158,6 +161,7 @@ def main(args):
         hidden_size=rnn_hidden_size, n_layers=rnn_n_layers, dropout_rate=dropout,
         n_classes=n_classes, pretrained=pretrained, cnn_model=cnn_backbone,
         fine_tune_last_block=fine_tune_last_block, bidirectional=bidirectional,
+        rnn_layer_norm=rnn_layer_norm,
     )
 
     if mode == 'train':
@@ -178,6 +182,7 @@ def main(args):
             f"  RNN hidden size/direction:  {rnn_hidden_size}\n"
             f"  RNN layers:                 {rnn_n_layers}\n"
             f"  Bidirectional LSTM:         {bidirectional}\n"
+            f"  RNN output LayerNorm:       {rnn_layer_norm}\n"
             f"  Dropout:                    {dropout}\n"
             f"  Pretrained backbone:        {pretrained}\n"
             f"  CNN backbone:               {cnn_backbone}\n"
@@ -189,7 +194,7 @@ def main(args):
             f"  Batch size:                 {batch_size}\n"
             f"  Epochs:                     {n_epochs}\n"
             f"  Learning rate:              {learning_rate}\n"
-            "  Optimizer:                  AdamW\n"
+            f"  Optimizer:                  AdamW\n"
             f"  Weight decay:               {weight_decay}\n"
             f"  Device:                     {device}\n"
             "\n"
@@ -244,16 +249,17 @@ def main(args):
         print(
             "\n"
             "========== Evaluation Configuration ==========\n"
-            f"  Checkpoint:        {ckpt}\n"
-            f"  Model type:        {model_type}\n"
-            f"  CNN backbone:      {cnn_backbone}\n"
-            f"  RNN hidden size/direction: {rnn_hidden_size}\n"
-            f"  RNN layers:        {rnn_n_layers}\n"
-            f"  Bidirectional LSTM: {bidirectional}\n"
-            f"  Number of classes: {n_classes}\n"
-            f"  Frames per video:  {fr_per_vid}\n"
-            f"  Batch size:        {batch_size}\n"
-            f"  Device:            {device}\n"
+            f"  Checkpoint:                 {ckpt}\n"
+            f"  Model type:                 {model_type}\n"
+            f"  CNN backbone:               {cnn_backbone}\n"
+            f"  RNN hidden size/direction:  {rnn_hidden_size}\n"
+            f"  RNN layers:                 {rnn_n_layers}\n"
+            f"  Bidirectional LSTM:         {bidirectional}\n"
+            f"  RNN output LayerNorm:       {rnn_layer_norm}\n"
+            f"  Number of classes:          {n_classes}\n"
+            f"  Frames per video:           {fr_per_vid}\n"
+            f"  Batch size:                 {batch_size}\n"
+            f"  Device:                     {device}\n"
             "==============================================\n"
         )
 

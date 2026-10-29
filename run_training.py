@@ -30,6 +30,7 @@ Arguments include:
     -rhs/--rnn_hidden_size: LSTM hidden features per direction (default: 100).
     -rnl/--rnn_n_layers: Number of RNN/LSTM layers (default: 1).
     --bidirectional: Enable whole-sequence BiLSTM processing (default: off).
+    --rnn_layer_norm: Normalize recurrent outputs before temporal pooling (default: off).
     -bs/--batch_size: Mini-batch size (required).
     -d/--dropout: Dropout rate for regularization (default: 0.1).
     -lr/--learning_rate: Learning rate for training (default: 3e-5).
@@ -73,6 +74,7 @@ def args_parser():
         -rhs/--rnn_hidden_size: LSTM hidden features per direction (default: 100).
         -rnl/--rnn_n_layers: Number of RNN/LSTM layers (default: 1).
         --bidirectional: Enable whole-sequence BiLSTM processing (default: off).
+        --rnn_layer_norm: Normalize recurrent outputs before temporal pooling (default: off).
         -d/--dropout: Dropout rate (default: 0.1).
         -lr/--learning_rate: Learning rate for training (default: 3e-5).
         --weight_decay: AdamW weight decay; zero disables decay (default: 0.0).
@@ -93,6 +95,7 @@ def args_parser():
     parser.add_argument('-rhs', '--rnn_hidden_size', type=int, default=100, help='Number of LSTM hidden features per direction')
     parser.add_argument('-rnl', '--rnn_n_layers', type=int, default=1, help='Number of RNN/LSTM layers')
     parser.add_argument('--bidirectional', action='store_true', help='Use a whole-sequence bidirectional LSTM (default: off)')
+    parser.add_argument('--rnn_layer_norm', action='store_true', help='Apply LayerNorm to recurrent outputs before temporal pooling (default: off)')
 
     parser.add_argument('-bs', '--batch_size', type=int, help='Mini-batch size', required=True)
     parser.add_argument('-d', '--dropout', type=float, default=0.1, help='Dropout rate for regularization')
@@ -134,6 +137,7 @@ def trainer(args):
     rnn_hidden_size = args.rnn_hidden_size
     rnn_n_layers = args.rnn_n_layers
     bidirectional = args.bidirectional
+    rnn_layer_norm = args.rnn_layer_norm
     dropout = args.dropout
     pretrained = args.pretrained
     cnn_backbone = args.cnn_backbone
@@ -168,7 +172,9 @@ def trainer(args):
         hidden_size=rnn_hidden_size, n_layers=rnn_n_layers, dropout_rate=dropout,
         n_classes=n_classes, pretrained=pretrained, cnn_model=cnn_backbone,
         bidirectional=bidirectional,
+        rnn_layer_norm=rnn_layer_norm,
     )
+    print(f"RNN output LayerNorm: {rnn_layer_norm}")
     model = model.to(device)
 
     # Define the loss function, optimizer, and learning rate scheduler
