@@ -390,7 +390,6 @@ def main(args):
                 metrics_path = os.path.join(run_dir, f'test_metrics_{stem}.json')
                 with open(metrics_path, 'w', encoding='utf-8') as output:
                     json.dump(result, output, indent=2)
-                print(f"Mean test loss: {evaluation_metrics['loss']:.6f}")
                 print(f'Saved test metrics to: {metrics_path}')
                 if wandb_run is not None:
                     logged = {f'test/{name}': value for name, value in evaluation_metrics.items()}
@@ -403,6 +402,8 @@ def main(args):
             raise
         finally:
             finish_tracking(wandb_run, exit_code=exit_code)
+        if evaluation_metrics:
+            print(f"The overall test loss is {evaluation_metrics['loss']:.6f}.")
         print('The overall test accuracy is {:.4f}%.'.format(100 * accuracy))
 
     else:
