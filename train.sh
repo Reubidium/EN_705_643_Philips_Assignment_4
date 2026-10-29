@@ -10,9 +10,9 @@ python run.py \
     --rnn_layer_norm \
     --n_classes 50 \
     --fr_per_vid 16 \
-    --batch_size 6 \
+    --batch_size 7 \
     --mode 'train' \
-    --n_epochs 30 \
+    --n_epochs 20 \
     --num_workers 4 \
     --dropout 0.3 \
     --learning_rate 3e-5 \
