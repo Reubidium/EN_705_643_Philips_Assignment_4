@@ -1,0 +1,56 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.12.7, pytest-7.4.4, pluggy-1.5.0 -- /opt/anaconda3/bin/python
+cachedir: .pytest_cache
+rootdir: /Users/rphili/Documents/College/JHU/Fall_2026/Module_7_Video_Action_Recognition/Assignment/assignment_4
+plugins: anyio-4.6.2
+collecting ... collected 6 items
+
+test_units.py::test_uniform_frame_sampling test_uniform_frame_sampling
+Objective: Verify that evaluation frame sampling is ordered, deterministic, and spans the video.
+Sampling 16 frames from a 64-frame video...
+sample_frame_indices returned: [0, 4, 8, 12, 16, 21, 25, 29, 33, 37, 42, 46, 50, 54, 58, 63]
+Selected 16 frames, from frame 0 to frame 63.
+====================================================================================================
+
+PASSED
+test_units.py::test_random_frame_sampling test_random_frame_sampling
+Objective: Verify that training frame sampling selects one frame from each temporal segment.
+sample_frame_indices returned: [1, 5, 9, 13, 16, 21, 27, 29, 35, 36, 41, 44, 50, 54, 57, 63]
+====================================================================================================
+
+PASSED
+test_units.py::test_dataset_splits_do_not_share_groups Splitting train/validation/test datasets....
+test_dataset_splits_do_not_share_groups
+Objective: Verify that each related-video group appears in only one split to prevent data leakage.
+dataset_split assigned 50 videos: 30 train, 10 validation, 10 test.
+Group overlap checks: train/validation=False, train/test=False, validation/test=False.
+====================================================================================================
+
+PASSED
+test_units.py::test_padding_keeps_original_lengths test_padding_keeps_original_lengths
+Objective: Verify that variable-length video clips are padded to the batch maximum while their original lengths are preserved.
+Input clip shapes: short=(2, 3, 4, 4), long=(4, 3, 4, 4).
+collate_fn_rnn returned frames with shape (2, 4, 3, 4, 4) and labels [0, 1].
+Original clip lengths: [2, 4]; padded frames in the short clip: 2.
+Added frames are all zero: True.
+====================================================================================================
+
+PASSED
+test_units.py::test_model_output_shape test_model_output_shape
+Objective: Verify that the model returns one class score per class for each video.
+Input videos have shape (2, 2, 3, 32, 32) and sequence lengths [2, 1].
+Model returned output with shape (2, 50): 2 videos and 50 class scores per video.
+====================================================================================================
+
+PASSED
+test_units.py::test_evaluation_loss_and_accuracy   0%|          | 0/1 [00:00<?, ?it/s]100%|██████████| 1/1 [00:00<00:00, 219.34it/s]
+test_evaluation_loss_and_accuracy
+Objective: Verify that evaluation computes the expected predictions, accuracy, and cross-entropy loss.
+Input scores have shape (2, 2); labels=[0, 1], sequence lengths=[1, 1].
+Evaluation returned predictions [0, 0], accuracy 0.500, and loss 0.693147.
+Expected: predictions [0, 0], accuracy 0.500, and loss approximately 0.693147.
+====================================================================================================
+
+PASSED
+
+============================== 6 passed in 3.72s ===============================

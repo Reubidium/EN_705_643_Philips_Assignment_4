@@ -1,0 +1,23 @@
+************* Module models
+models.py:48:0: R0902: Too many instance attributes (8/7) (too-many-instance-attributes)
+models.py:76:4: R0913: Too many arguments (10/5) (too-many-arguments)
+models.py:76:4: R0917: Too many positional arguments (10/5) (too-many-positional-arguments)
+************* Module train
+train.py:53:0: R0913: Too many arguments (11/5) (too-many-arguments)
+train.py:53:0: R0917: Too many positional arguments (11/5) (too-many-positional-arguments)
+train.py:53:0: R0914: Too many local variables (23/15) (too-many-locals)
+************* Module utils
+utils.py:40:12: I1101: Module 'cv2' has no 'VideoCapture' member, but source is unavailable. Consider adding this module to extension-pkg-allow-list if you want to perform analysis based on run-time introspection of living objects. (c-extension-no-member)
+utils.py:44:26: I1101: Module 'cv2' has no 'CAP_PROP_FRAME_COUNT' member, but source is unavailable. Consider adding this module to extension-pkg-allow-list if you want to perform analysis based on run-time introspection of living objects. (c-extension-no-member)
+utils.py:56:20: I1101: Module 'cv2' has no 'cvtColor' member, but source is unavailable. Consider adding this module to extension-pkg-allow-list if you want to perform analysis based on run-time introspection of living objects. (c-extension-no-member)
+utils.py:56:40: I1101: Module 'cv2' has no 'COLOR_BGR2RGB' member, but source is unavailable. Consider adding this module to extension-pkg-allow-list if you want to perform analysis based on run-time introspection of living objects. (c-extension-no-member)
+utils.py:77:16: I1101: Module 'cv2' has no 'cvtColor' member, but source is unavailable. Consider adding this module to extension-pkg-allow-list if you want to perform analysis based on run-time introspection of living objects. (c-extension-no-member)
+utils.py:77:36: I1101: Module 'cv2' has no 'COLOR_RGB2BGR' member, but source is unavailable. Consider adding this module to extension-pkg-allow-list if you want to perform analysis based on run-time introspection of living objects. (c-extension-no-member)
+utils.py:79:8: I1101: Module 'cv2' has no 'imwrite' member, but source is unavailable. Consider adding this module to extension-pkg-allow-list if you want to perform analysis based on run-time introspection of living objects. (c-extension-no-member)
+************* Module tracking
+tracking.py:141:0: R0913: Too many arguments (8/5) (too-many-arguments)
+tracking.py:141:0: R0917: Too many positional arguments (8/5) (too-many-positional-arguments)
+
+------------------------------------------------------------------
+Your code has been rated at 9.90/10 (previous run: 9.90/10, +0.00)
+

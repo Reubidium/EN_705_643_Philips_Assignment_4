@@ -13,6 +13,7 @@ This project implements a video classification pipeline using the UCF50 dataset.
 - [Preprocessing and Frame Extraction](#preprocessing-and-frame-extraction)
 - [Training the Model](#training-the-model)
 - [Testing and Evaluation](#testing-and-evaluation)
+- [Unit Testing and Code Quality](#unit-testing-and-code-quality)
 - [Project Structure](#project-structure)
 - [Customization and Hyperparameters](#customization-and-hyperparameters)
 
@@ -206,9 +207,39 @@ The testing script will:
 - **Save the results locally** in `test_metrics_<checkpoint_name>.json` in the run folder, such as `test_metrics_best_model_wts.json`.
 - **Log test metrics to W&B when enabled.** Matching online `tracking.json` metadata lets evaluation append results to the original training run. Without that metadata, it creates a separate evaluation run unless `--wandb_run_id` is supplied.
 
-The terminal prints accuracy as a percentage; JSON and W&B store it as a fraction, so `0.92` means `92%`.
+The terminal prints accuracy as a percentage.
 
-The runner reports loss and accuracy. Classification-report and confusion-matrix helpers are available in `test.py`, but the testing script does not call them automatically.
+---
+
+## Unit Testing and Code Quality
+
+### Pytest
+
+`test_units.py` contains basic tests for frame sampling, group-disjoint splitting, padding and sequence lengths, model output shape, and evaluation loss and accuracy.
+
+The tests use small example inputs and do not require the UCF50 dataset or downloaded pretrained weights. They check code functionality; trained-model accuracy is evaluated separately using `test.sh`.
+
+Run the tests and save their output:
+
+```bash
+python -m pytest -v -s test_units.py > pytest_output.txt 2>&1
+```
+
+The `-v` option lists each test, and `-s` includes the explanatory print statements.
+
+See [pytest_output.txt](pytest_output.txt) for the test results.
+
+### Pylint
+
+Pylint checks the Python files for issues such as unused imports, formatting problems, and overly complex functions. Its score and remaining findings are recorded in the report.
+
+Run Pylint and save its output:
+
+```bash
+python -m pylint models.py preprocess.py run.py train.py test.py utils.py video_datasets.py tracking.py test_units.py > pylint_output.txt 2>&1
+```
+
+See [pylint_output.txt](pylint_output.txt) for the findings and score.
 
 ---
 
@@ -221,6 +252,7 @@ The runner reports loss and accuracy. Classification-report and confusion-matrix
 | `models.py` | Define the CNN and recurrent video-classification model. |
 | `train.py` | Run training and validation, record metrics, and save the best weights. |
 | `test.py` | Calculate test loss and accuracy and provide reporting helpers. |
+| `test_units.py` | Run basic pytest checks for key pipeline functionality. |
 | `video_datasets.py` | Load clips, sample frames, split by group, and pad batches. |
 | `utils.py` | Provide frame-processing helpers, transforms, and DataLoaders. |
 | `tracking.py` | Manage optional W&B logging and run metadata. |
