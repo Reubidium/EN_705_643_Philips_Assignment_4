@@ -8,6 +8,7 @@ This project implements a video classification pipeline using the UCF50 dataset.
 
 - [Errors Found and Fixed](#errors-found-and-fixed)
 - [Model Improvements](#model-improvements)
+- [Results](#results)
 - [Dataset Preparation](#dataset-preparation)
 - [Environment Setup](#environment-setup)
 - [Preprocessing and Frame Extraction](#preprocessing-and-frame-extraction)
@@ -61,6 +62,97 @@ Video frames -> CNN features -> BiLSTM -> LayerNorm -> Mean over valid timesteps
 ### Efforts to Reduce Overfitting
 
 Training uses random temporal segment sampling and spatial/color augmentation shared across the frames in each clip. Random temporal sampling and spatial/color augmentation expose the model to different versions of each training video, reducing its tendency to memorize specific frames or visual details. Validation and test sampling remain deterministic.
+
+---
+
+## Results
+
+### Best Completed Run
+
+The best completed run so far is `20261028_205151_248095`.
+
+| Metric | Result |
+|---|---:|
+| Test loss | 0.346291 |
+| Test accuracy | 92.2090% |
+
+This run was not logged to W&B. Its results are documented using the saved training history/logs, dataset splits, checkpoint, and test-metrics JSON file.
+
+#### Training Configuration for the Best Run
+
+To use the best-run settings reconstructed from the historical training script, replace the contents of `train.sh` with:
+
+```bash
+python run.py \
+    --frame_dir UCF50_Captured_Frames \
+    --train_size 0.60 \
+    --test_size 0.20 \
+    --cnn_backbone convnext_tiny \
+    --pretrained true \
+    --rnn_hidden_size 100 \
+    --rnn_n_layers 1 \
+    --bidirectional \
+    --rnn_layer_norm \
+    --n_classes 50 \
+    --fr_per_vid 16 \
+    --batch_size 6 \
+    --mode train \
+    --n_epochs 100 \
+    --num_workers 4 \
+    --dropout 0.3 \
+    --learning_rate 3e-5 \
+    --cnn_learning_rate 3e-5 \
+    --weight_decay 0.0 \
+    --label_smoothing 0.0 \
+    --random_temporal_sampling
+```
+
+From the project directory, run:
+
+```bash
+bash train.sh
+```
+
+The epoch limit is 100; completed epochs are recorded in `metrics.csv`.
+
+Matching the settings does not guarantee identical metrics because initialization, shuffled batches, frame sampling, and augmentation include randomness.
+
+#### Evaluate the Best Checkpoint
+
+To display the best checkpoint's test loss and accuracy, replace the contents of `test.sh` with the following:
+
+```bash
+python run.py \
+    --ckpt ./runs/20261028_205151_248095/models/best_model_wts.pt \
+    --cnn_backbone convnext_tiny \
+    --rnn_hidden_size 100 \
+    --rnn_n_layers 1 \
+    --bidirectional \
+    --rnn_layer_norm \
+    --n_classes 50 \
+    --fr_per_vid 16 \
+    --batch_size 16 \
+    --mode eval
+```
+
+Keep `splits.npy` in `runs/20261028_205151_248095/`, alongside the `models` folder. From the project directory, run:
+
+```bash
+bash test.sh
+```
+
+#### Saved Run Artifacts
+
+The following paths refer to the best-run files under `runs/20261028_205151_248095/`:
+
+- [Best model weights](runs/20261028_205151_248095/models/best_model_wts.pt): the saved CNN and recurrent-model weights.
+- [Training metrics](runs/20261028_205151_248095/metrics.csv): training and validation loss and accuracy by epoch.
+- [Dataset splits](runs/20261028_205151_248095/splits.npy): the video paths and labels assigned to each split.
+- [Test metrics](runs/20261028_205151_248095/test_metrics_best_model_wts.json): the measured test loss, test accuracy, and evaluation details.
+
+### W&B Completed Run
+
+
 
 ---
 
