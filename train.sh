@@ -2,7 +2,7 @@
 python run.py \
     --frame_dir UCF50_Captured_Frames \
     --train_size 0.60 \
-    --test_size 0.30 \
+    --test_size 0.20 \
     --cnn_backbone convnext_tiny \
     --rnn_hidden_size 100 \
     --rnn_n_layers 1 \
