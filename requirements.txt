@@ -6,3 +6,5 @@ tqdm
 numpy
 Pillow
 wandb
+pytest
+pylint
