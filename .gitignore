@@ -4,3 +4,5 @@ UCF50.rar
 UCF50_Captured_Frames/
 runs/
 **/__pycache__/
+.DS_Store
+**/.vscode/
