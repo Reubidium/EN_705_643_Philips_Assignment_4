@@ -6,6 +6,8 @@ This project implements a video classification pipeline using the UCF50 dataset.
 
 ## Table of Contents
 
+- [Errors Found and Fixed](#errors-found-and-fixed)
+- [Model Improvements](#model-improvements)
 - [Dataset Preparation](#dataset-preparation)
 - [Environment Setup](#environment-setup)
 - [Preprocessing and Frame Extraction](#preprocessing-and-frame-extraction)
@@ -13,6 +15,51 @@ This project implements a video classification pipeline using the UCF50 dataset.
 - [Testing and Evaluation](#testing-and-evaluation)
 - [Project Structure](#project-structure)
 - [Customization and Hyperparameters](#customization-and-hyperparameters)
+
+---
+
+## Errors Found and Fixed
+
+### 1. Incorrect LSTM Batch Layout
+
+The original LSTM used its default sequence-first layout, but the forward pass supplied features shaped as `(batch, 1, features)`. This prevented the model from treating each video as a separate sequence of frames. To fix this, LSTM was updated to use `batch_first=True`.
+
+### 2. Data Leakage Between Related Videos
+
+The original split used stratified sampling on individual videos. UCF50 groups contain clips that may share the same person, background, or camera viewpoint, so closely related videos could appear in more than 1 set (i.e., training, validation, testing). This could make validation and test results overly optimistic. To fix this, the split now reads the group number from each video name and uses `GroupShuffleSplit`. Each group stays in only one of training, validation, or testing.
+
+### 3. Frame Order, Padding, and Augmentation
+
+- **Frame order:** Frame filenames are sorted by their numeric index. This prevents `frame10.jpg` from appearing before `frame2.jpg` and preserves chronological order.
+- **Requested frame count:** Frame extraction previously selected `n_frames + 1` positions. It now requests `n_frames` positions.
+- **Padding:** Real clip lengths are recorded before padding. Padded recurrent outputs are excluded from temporal averaging, and the CNN processes only genuine frames, preventing padded images from affecting ResNet BatchNorm statistics.
+- **Consistent augmentation:** Random transforms are applied to the entire clip instead of separately to each frame. This prevents frames of the same clip being inconsistent with each other due to the applied transforms being uniquely applied to each frame.
+
+---
+
+## Model Improvements
+
+### 1. Pretrained ConvNeXt-Tiny Backbone
+
+Backbone experiments showed that ConvNeXt-Tiny achieved higher validation and test accuracy than ResNet-34 and ResNet-50, so it was selected for the final model. Its pretrained CNN extracts features from each video frame, which the recurrent network then uses to model motion over time.
+
+### 2. Bidirectional LSTM
+
+The training script enables `--bidirectional`. The LSTM processes each video's frame features in chronological and reverse order, allowing its representations to incorporate context from both earlier and later frames.
+
+### 3. Layer Normalization Before Temporal Pooling
+
+The training script enables `--rnn_layer_norm`. Layer normalization normalizes each timestep's recurrent features independently, before the model averages features across the video's valid timesteps. This keeps the feature scale more consistent during pooling.
+
+The resulting flow is:
+
+```text
+Video frames -> CNN features -> BiLSTM -> LayerNorm -> Mean over valid timesteps -> Dropout -> Class scores
+```
+
+### Efforts to Reduce Overfitting
+
+Training uses random temporal segment sampling and spatial/color augmentation shared across the frames in each clip. Random temporal sampling and spatial/color augmentation expose the model to different versions of each training video, reducing its tendency to memorize specific frames or visual details. Validation and test sampling remain deterministic.
 
 ---
 
@@ -48,7 +95,7 @@ Install the required Python packages by running:
 pip install -r requirements.txt
 ```
 
-# Key Libraries
+### Key Libraries
 
 - **PyTorch**
 - **torchvision**
@@ -118,7 +165,7 @@ Execute the training script from your terminal:
 bash train.sh
 ```
 
-## During Training, the Script Will:
+### During Training, the Script Will:
 
 - **Load the captured video frames** from the directory specified by --frame_dir
 - **Split the dataset** into training, validation, and test sets using group-disjoint sampling. UCF50 videos from the same group of videos of the same or similar recording remain in the same split to prevent data leakage. These splits are saved automatically for later testing.
