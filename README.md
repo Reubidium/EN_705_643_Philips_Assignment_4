@@ -150,9 +150,29 @@ The following paths refer to the best-run files under `runs/20261028_205151_2480
 - [Dataset splits](runs/20261028_205151_248095/splits.npy): the video paths and labels assigned to each split.
 - [Test metrics](runs/20261028_205151_248095/test_metrics_best_model_wts.json): the measured test loss, test accuracy, and evaluation details.
 
+NOTE: Model weights could not be committed to GitHub because it exceeded the max 100 MB size. Please check Canvas submission that includes the attached best_model_wts.pt to verify test accuracy.
+
 ### W&B Completed Run
 
+The completed W&B-tracked run is `20261029_210111_836715`.
 
+| Metric | Result |
+|---|---:|
+| Test loss | 0.437633 |
+| Test accuracy | 88.3593% |
+
+This run was logged to the public [W&B project](https://forge.coreweave.com/wandb/rphilip4-johns-hopkins-university/Philips_Assignment_4_Video_Action_Recognition). The earlier run, `20261028_205151_248095`, remains the best measured test result.
+
+#### Saved Run Artifacts
+
+The following paths refer to this run's files under `runs/20261029_210111_836715/`:
+
+- [Model weights](runs/20261029_210111_836715/models/best_model_wts.pt): the saved CNN and recurrent-model weights.
+- [Training metrics](runs/20261029_210111_836715/metrics.csv): training and validation loss and accuracy by epoch.
+- [Dataset splits](runs/20261029_210111_836715/splits.npy): the video paths and labels assigned to each split.
+- [Test metrics](runs/20261029_210111_836715/test_metrics_best_model_wts.json): the measured test loss, test accuracy, and evaluation details.
+
+NOTE: Model weights could not be committed to GitHub because it exceeded the max 100 MB size. Please check W&B to verify results.
 
 ---
 
